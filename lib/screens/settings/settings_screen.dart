@@ -1,22 +1,649 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/date_helpers.dart';
+import '../../models/table_model.dart';
+import '../../providers/settings_providers.dart';
+import '../../providers/table_providers.dart';
+import '../../services/backup/backup_service.dart';
+import '../../core/database/database_helper.dart';
+import '../../services/printer/printer_service.dart';
+import '../../widgets/confirm_dialog.dart';
+import '../../widgets/section_header.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  @override
   Widget build(BuildContext context) {
+    final settingsAsync = ref.watch(settingsNotifierProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      body: settingsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (settings) => ListView(
           children: [
-            Icon(Icons.settings_outlined, size: 64, color: AppColors.textDisabled),
-            SizedBox(height: 16),
-            Text('Settings — Coming in Phase 10'),
+            const SectionHeader(title: 'Cafe Info'),
+            _SettingsTile(
+              icon: Icons.store_outlined,
+              label: 'Cafe Name',
+              value: settings[AppConstants.settingCafeName] ?? 'My Cafe',
+              onTap: () => _editSetting(
+                context,
+                key: AppConstants.settingCafeName,
+                label: 'Cafe Name',
+                current: settings[AppConstants.settingCafeName] ?? '',
+              ),
+            ),
+            _SettingsTile(
+              icon: Icons.location_on_outlined,
+              label: 'Address',
+              value: settings[AppConstants.settingCafeAddress]?.isEmpty ?? true
+                  ? 'Not set'
+                  : settings[AppConstants.settingCafeAddress]!,
+              onTap: () => _editSetting(
+                context,
+                key: AppConstants.settingCafeAddress,
+                label: 'Address',
+                current: settings[AppConstants.settingCafeAddress] ?? '',
+                maxLines: 2,
+              ),
+            ),
+            _SettingsTile(
+              icon: Icons.phone_outlined,
+              label: 'Phone',
+              value: settings[AppConstants.settingCafePhone]?.isEmpty ?? true
+                  ? 'Not set'
+                  : settings[AppConstants.settingCafePhone]!,
+              onTap: () => _editSetting(
+                context,
+                key: AppConstants.settingCafePhone,
+                label: 'Phone',
+                current: settings[AppConstants.settingCafePhone] ?? '',
+                inputType: TextInputType.phone,
+              ),
+            ),
+
+            const SectionHeader(title: 'Billing'),
+            _SettingsTile(
+              icon: Icons.percent_outlined,
+              label: 'Tax Rate',
+              value: '${settings[AppConstants.settingTaxPercent] ?? '0'}%',
+              onTap: () => _editSetting(
+                context,
+                key: AppConstants.settingTaxPercent,
+                label: 'Tax Rate (%)',
+                current: settings[AppConstants.settingTaxPercent] ?? '0',
+                inputType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+            ),
+            _SettingsTile(
+              icon: Icons.currency_exchange_outlined,
+              label: 'Currency Symbol',
+              value: settings[AppConstants.settingCurrencySymbol] ??
+                  AppConstants.defaultCurrencySymbol,
+              onTap: () => _editSetting(
+                context,
+                key: AppConstants.settingCurrencySymbol,
+                label: 'Currency Symbol',
+                current: settings[AppConstants.settingCurrencySymbol] ??
+                    AppConstants.defaultCurrencySymbol,
+              ),
+            ),
+
+            const SectionHeader(title: 'Receipt'),
+            _SettingsTile(
+              icon: Icons.text_fields_outlined,
+              label: 'Receipt Header',
+              value: settings[AppConstants.settingReceiptHeader]?.isEmpty ?? true
+                  ? 'Not set'
+                  : settings[AppConstants.settingReceiptHeader]!,
+              onTap: () => _editSetting(
+                context,
+                key: AppConstants.settingReceiptHeader,
+                label: 'Receipt Header',
+                current: settings[AppConstants.settingReceiptHeader] ?? '',
+                maxLines: 2,
+              ),
+            ),
+            _SettingsTile(
+              icon: Icons.text_fields_outlined,
+              label: 'Receipt Footer',
+              value: settings[AppConstants.settingReceiptFooter]?.isEmpty ?? true
+                  ? 'Not set'
+                  : settings[AppConstants.settingReceiptFooter]!,
+              onTap: () => _editSetting(
+                context,
+                key: AppConstants.settingReceiptFooter,
+                label: 'Receipt Footer',
+                current: settings[AppConstants.settingReceiptFooter] ?? '',
+                maxLines: 2,
+              ),
+            ),
+
+            const SectionHeader(title: 'Printers'),
+            _PrinterTile(
+              label: 'POS Printer (Receipts)',
+              addressKey: AppConstants.settingPosPrinterAddress,
+              nameKey: AppConstants.settingPosPrinterName,
+              settings: settings,
+            ),
+            _PrinterTile(
+              label: 'Kitchen Printer (Tickets)',
+              addressKey: AppConstants.settingKitchenPrinterAddress,
+              nameKey: AppConstants.settingKitchenPrinterName,
+              settings: settings,
+            ),
+
+            const SectionHeader(title: 'Tables'),
+            _TableManagementTile(),
+
+            const SectionHeader(title: 'Backup & Restore'),
+            _BackupRestoreSection(),
+
+            const SizedBox(height: 32),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _editSetting(
+    BuildContext context, {
+    required String key,
+    required String label,
+    required String current,
+    TextInputType inputType = TextInputType.text,
+    int maxLines = 1,
+  }) async {
+    final ctrl = TextEditingController(text: current);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Edit $label'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: inputType,
+          maxLines: maxLines,
+          decoration: InputDecoration(labelText: label),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    if (result != null) {
+      ref.read(settingsNotifierProvider.notifier).set(key, result);
+    }
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  const _SettingsTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+        leading: Icon(icon, size: 22, color: AppColors.textSecondary),
+        title: Text(label),
+        subtitle: Text(value,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: AppColors.textSecondary)),
+        trailing: const Icon(Icons.chevron_right, size: 18,
+            color: AppColors.textSecondary),
+        onTap: onTap,
+      );
+}
+
+// ── Printer Tile ──────────────────────────────────────────────────────────────
+
+class _PrinterTile extends ConsumerWidget {
+  final String label;
+  final String addressKey;
+  final String nameKey;
+  final Map<String, String> settings;
+
+  const _PrinterTile({
+    required this.label,
+    required this.addressKey,
+    required this.nameKey,
+    required this.settings,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = settings[nameKey] ?? '';
+    final address = settings[addressKey] ?? '';
+
+    return ListTile(
+      leading:
+          const Icon(Icons.print_outlined, size: 22, color: AppColors.textSecondary),
+      title: Text(label),
+      subtitle: Text(
+        name.isEmpty ? 'Not configured' : '$name ($address)',
+        style: Theme.of(context)
+            .textTheme
+            .bodySmall
+            ?.copyWith(color: AppColors.textSecondary),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: const Icon(Icons.chevron_right, size: 18,
+          color: AppColors.textSecondary),
+      onTap: () => _showPrinterPicker(context, ref, name, address),
+    );
+  }
+
+  Future<void> _showPrinterPicker(BuildContext context, WidgetRef ref,
+      String currentName, String currentAddress) async {
+    final devices = await PrinterService.instance.scanDevices();
+
+    if (!context.mounted) return;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(label,
+                style: Theme.of(ctx).textTheme.titleMedium),
+          ),
+          const Divider(height: 1),
+          if (devices.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('No paired Bluetooth devices found.\nPair your printer in Android Bluetooth settings first.'),
+            )
+          else
+            ...devices.map(
+              (d) => ListTile(
+                leading: const Icon(Icons.print_outlined),
+                title: Text(d.name),
+                subtitle: Text(d.macAdress),
+                selected: currentAddress == d.macAdress,
+                selectedTileColor: AppColors.primaryLight.withOpacity(0.2),
+                onTap: () {
+                  ref
+                      .read(settingsNotifierProvider.notifier)
+                      .setAll({
+                    nameKey: d.name,
+                    addressKey: d.macAdress,
+                  });
+                  Navigator.pop(ctx);
+                },
+              ),
+            ),
+          if (currentAddress.isNotEmpty)
+            ListTile(
+              leading:
+                  const Icon(Icons.link_off, color: AppColors.error),
+              title: const Text('Remove Printer',
+                  style: TextStyle(color: AppColors.error)),
+              onTap: () {
+                ref
+                    .read(settingsNotifierProvider.notifier)
+                    .setAll({nameKey: '', addressKey: ''});
+                Navigator.pop(ctx);
+              },
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Table Management Tile ─────────────────────────────────────────────────────
+
+class _TableManagementTile extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tablesAsync = ref.watch(tablesProvider);
+    return tablesAsync.when(
+      loading: () => const ListTile(title: Text('Loading tables...')),
+      error: (_, __) => const ListTile(title: Text('Error loading tables')),
+      data: (tables) => ListTile(
+        leading: const Icon(Icons.table_restaurant_outlined,
+            size: 22, color: AppColors.textSecondary),
+        title: const Text('Manage Tables'),
+        subtitle: Text('${tables.length} table${tables.length == 1 ? '' : 's'}'),
+        trailing: const Icon(Icons.chevron_right, size: 18,
+            color: AppColors.textSecondary),
+        onTap: () => _showTableManager(context, ref, tables),
+      ),
+    );
+  }
+
+  void _showTableManager(BuildContext context, WidgetRef ref,
+      List<TableModel> tables) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.6,
+        builder: (_, sc) => Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+              child: Row(
+                children: [
+                  Text('Tables',
+                      style: Theme.of(ctx).textTheme.titleMedium),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: () => _addTable(ctx, ref),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: tables.isEmpty
+                  ? const Center(child: Text('No tables yet'))
+                  : ListView.separated(
+                      controller: sc,
+                      itemCount: tables.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1),
+                      itemBuilder: (_, i) {
+                        final t = tables[i];
+                        return ListTile(
+                          leading: const Icon(Icons.table_restaurant),
+                          title: Text(t.name),
+                          subtitle:
+                              Text('Capacity: ${t.capacity}'),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline,
+                                color: AppColors.error, size: 20),
+                            onPressed: () async {
+                              final ok = await showConfirmDialog(
+                                ctx,
+                                title: 'Delete Table',
+                                message: 'Delete "${t.name}"?',
+                                confirmLabel: 'Delete',
+                                destructive: true,
+                              );
+                              if (ok) {
+                                ref
+                                    .read(tablesProvider.notifier)
+                                    .remove(t.id!);
+                              }
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _addTable(BuildContext context, WidgetRef ref) {
+    final nameCtrl = TextEditingController();
+    final capCtrl = TextEditingController(text: '4');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Table'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(
+                    labelText: 'Table name',
+                    hintText: 'e.g. Table 1')),
+            const SizedBox(height: 12),
+            TextField(
+                controller: capCtrl,
+                decoration:
+                    const InputDecoration(labelText: 'Capacity'),
+                keyboardType: TextInputType.number),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final name = nameCtrl.text.trim();
+              if (name.isEmpty) return;
+              ref.read(tablesProvider.notifier).add(
+                    TableModel.create(
+                        name: name,
+                        capacity:
+                            int.tryParse(capCtrl.text.trim()) ?? 4),
+                  );
+              Navigator.pop(ctx);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Backup & Restore Section ──────────────────────────────────────────────────
+
+class _BackupRestoreSection extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_BackupRestoreSection> createState() =>
+      _BackupRestoreSectionState();
+}
+
+class _BackupRestoreSectionState
+    extends ConsumerState<_BackupRestoreSection> {
+  bool _exporting = false;
+  bool _importing = false;
+
+  BackupService get _backup =>
+      BackupService(DatabaseHelper.instance);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.cloud_upload_outlined,
+              size: 22, color: AppColors.textSecondary),
+          title: const Text('Export Backup'),
+          subtitle: const Text(
+              'Save all data to a .cafedesk file and share to Google Drive, email, etc.'),
+          trailing: _exporting
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.chevron_right, size: 18,
+                  color: AppColors.textSecondary),
+          onTap: _exporting ? null : _export,
+        ),
+        const Divider(height: 1, indent: 56),
+        ListTile(
+          leading: const Icon(Icons.cloud_download_outlined,
+              size: 22, color: AppColors.textSecondary),
+          title: const Text('Import Backup'),
+          subtitle: const Text(
+              'Restore from a .cafedesk file. Choose Merge to keep existing data.'),
+          trailing: _importing
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.chevron_right, size: 18,
+                  color: AppColors.textSecondary),
+          onTap: _importing ? null : _import,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _export() async {
+    setState(() => _exporting = true);
+    try {
+      await _backup.export();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Export failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  Future<void> _import() async {
+    setState(() => _importing = true);
+    try {
+      final payload = await _backup.pickAndParse();
+      if (payload == null) {
+        if (mounted) setState(() => _importing = false);
+        return;
+      }
+
+      final summary = await _backup.analyze(payload);
+
+      if (!mounted) return;
+      final mode = await _showImportDialog(summary);
+      if (mode == null) {
+        setState(() => _importing = false);
+        return;
+      }
+
+      if (mode == 'merge') {
+        await _backup.importMerge(payload);
+      } else {
+        await _backup.importReplace(payload);
+      }
+
+      // Refresh all providers
+      ref.read(settingsNotifierProvider.notifier).load();
+      ref.read(tablesProvider.notifier).load();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Backup restored successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Import failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+  }
+
+  Future<String?> _showImportDialog(
+      BackupConflictSummary summary) async {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore Backup'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (summary.exportedAt != null)
+                Text(
+                  'Backup from: ${DateHelpers.formatDateTime(summary.exportedAt!)}',
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary),
+                ),
+              if (summary.deviceName != null)
+                Text('Device: ${summary.deviceName}',
+                    style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary)),
+              const SizedBox(height: 12),
+              Text('New records to add: ${summary.totalNew}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.success)),
+              Text(
+                  'Already exist (will be skipped in Merge): ${summary.totalExisting}'),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: AppColors.warning.withOpacity(0.4)),
+                ),
+                child: const Text(
+                  '⚠ Full Replace will erase all current data.',
+                  style: TextStyle(
+                      fontSize: 12, color: AppColors.warning),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          OutlinedButton(
+            onPressed: () async {
+              final ok = await showConfirmDialog(
+                ctx,
+                title: 'Full Replace',
+                message:
+                    'This will DELETE all current data and replace it with the backup. Continue?',
+                confirmLabel: 'Replace All',
+                destructive: true,
+              );
+              if (ok && ctx.mounted) Navigator.pop(ctx, 'replace');
+            },
+            style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error)),
+            child: const Text('Full Replace'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, 'merge'),
+            child: const Text('Merge'),
+          ),
+        ],
       ),
     );
   }

@@ -1,7 +1,9 @@
+import 'package:uuid/uuid.dart';
 import '../core/utils/date_helpers.dart';
 
 class CustomerModel {
   final int? id;
+  final String uuid;
   final String name;
   final String? phone;
   final String? address;
@@ -9,6 +11,7 @@ class CustomerModel {
 
   const CustomerModel({
     this.id,
+    required this.uuid,
     required this.name,
     this.phone,
     this.address,
@@ -17,6 +20,7 @@ class CustomerModel {
 
   CustomerModel copyWith({
     int? id,
+    String? uuid,
     String? name,
     String? phone,
     String? address,
@@ -24,6 +28,7 @@ class CustomerModel {
   }) {
     return CustomerModel(
       id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
       name: name ?? this.name,
       phone: phone ?? this.phone,
       address: address ?? this.address,
@@ -33,6 +38,7 @@ class CustomerModel {
 
   Map<String, dynamic> toMap() => {
         if (id != null) 'id': id,
+        'uuid': uuid,
         'name': name,
         'phone': phone,
         'address': address,
@@ -40,7 +46,8 @@ class CustomerModel {
       };
 
   factory CustomerModel.fromMap(Map<String, dynamic> map) => CustomerModel(
-        id: map['id'] as int,
+        id: map['id'] as int?,
+        uuid: map['uuid'] as String,
         name: map['name'] as String,
         phone: map['phone'] as String?,
         address: map['address'] as String?,
@@ -52,5 +59,11 @@ class CustomerModel {
     String? phone,
     String? address,
   }) =>
-      CustomerModel(name: name, phone: phone, address: address, createdAt: DateTime.now());
+      CustomerModel(
+        uuid: const Uuid().v4(),
+        name: name,
+        phone: phone,
+        address: address,
+        createdAt: DateTime.now(),
+      );
 }

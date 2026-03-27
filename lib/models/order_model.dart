@@ -1,12 +1,16 @@
+import 'package:uuid/uuid.dart';
 import '../core/constants/app_constants.dart';
 import '../core/utils/date_helpers.dart';
 import 'order_item_model.dart';
 
 class OrderModel {
   final int? id;
+  final String uuid;
   final String type;
   final int? tableId;
+  final String? tableUuid;
   final int? customerId;
+  final String? customerUuid;
   final String? deliveryAddress;
   final String status;
   final String? discountType;
@@ -20,16 +24,19 @@ class OrderModel {
   final DateTime createdAt;
   final DateTime? completedAt;
 
-  // Eagerly loaded relations (not stored in DB)
+  // Eagerly loaded (not in DB columns)
   final List<OrderItemModel> items;
   final String? tableName;
   final String? customerName;
 
   const OrderModel({
     this.id,
+    required this.uuid,
     required this.type,
     this.tableId,
+    this.tableUuid,
     this.customerId,
+    this.customerUuid,
     this.deliveryAddress,
     this.status = AppConstants.orderStatusPending,
     this.discountType,
@@ -50,7 +57,6 @@ class OrderModel {
   bool get isDineIn => type == AppConstants.orderTypeDineIn;
   bool get isTakeaway => type == AppConstants.orderTypeTakeaway;
   bool get isDelivery => type == AppConstants.orderTypeDelivery;
-
   bool get isPending => status == AppConstants.orderStatusPending;
   bool get isPreparing => status == AppConstants.orderStatusPreparing;
   bool get isReady => status == AppConstants.orderStatusReady;
@@ -60,11 +66,20 @@ class OrderModel {
 
   String get displayId => '#${id?.toString().padLeft(4, '0') ?? '0000'}';
 
+  String get displayLabel {
+    if (isDineIn) return tableName ?? 'Table';
+    if (isDelivery) return customerName ?? 'Delivery';
+    return customerName ?? 'Takeaway';
+  }
+
   OrderModel copyWith({
     int? id,
+    String? uuid,
     String? type,
     int? tableId,
+    String? tableUuid,
     int? customerId,
+    String? customerUuid,
     String? deliveryAddress,
     String? status,
     String? discountType,
@@ -83,9 +98,12 @@ class OrderModel {
   }) {
     return OrderModel(
       id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
       type: type ?? this.type,
       tableId: tableId ?? this.tableId,
+      tableUuid: tableUuid ?? this.tableUuid,
       customerId: customerId ?? this.customerId,
+      customerUuid: customerUuid ?? this.customerUuid,
       deliveryAddress: deliveryAddress ?? this.deliveryAddress,
       status: status ?? this.status,
       discountType: discountType ?? this.discountType,
@@ -106,9 +124,12 @@ class OrderModel {
 
   Map<String, dynamic> toMap() => {
         if (id != null) 'id': id,
+        'uuid': uuid,
         'type': type,
         'table_id': tableId,
+        'table_uuid': tableUuid,
         'customer_id': customerId,
+        'customer_uuid': customerUuid,
         'delivery_address': deliveryAddress,
         'status': status,
         'discount_type': discountType,
@@ -124,10 +145,13 @@ class OrderModel {
       };
 
   factory OrderModel.fromMap(Map<String, dynamic> map) => OrderModel(
-        id: map['id'] as int,
+        id: map['id'] as int?,
+        uuid: map['uuid'] as String,
         type: map['type'] as String,
         tableId: map['table_id'] as int?,
+        tableUuid: map['table_uuid'] as String?,
         customerId: map['customer_id'] as int?,
+        customerUuid: map['customer_uuid'] as String?,
         deliveryAddress: map['delivery_address'] as String?,
         status: map['status'] as String? ?? AppConstants.orderStatusPending,
         discountType: map['discount_type'] as String?,
@@ -144,5 +168,12 @@ class OrderModel {
             : null,
         tableName: map['table_name'] as String?,
         customerName: map['customer_name'] as String?,
+      );
+
+  factory OrderModel.create({required String type, String uuid = ''}) =>
+      OrderModel(
+        uuid: uuid.isEmpty ? const Uuid().v4() : uuid,
+        type: type,
+        createdAt: DateTime.now(),
       );
 }

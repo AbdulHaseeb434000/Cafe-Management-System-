@@ -25,16 +25,18 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    await db.execute(_createCategories);
-    await db.execute(_createMenuItems);
-    await db.execute(_createTables);
-    await db.execute(_createCustomers);
-    await db.execute(_createOrders);
-    await db.execute(_createOrderItems);
-    await db.execute(_createPayments);
-    await db.execute(_createInventoryItems);
-    await db.execute(_createInventoryLogs);
-    await db.execute(_createSettings);
+    final batch = db.batch();
+    batch.execute(_createCategories);
+    batch.execute(_createMenuItems);
+    batch.execute(_createTables);
+    batch.execute(_createCustomers);
+    batch.execute(_createOrders);
+    batch.execute(_createOrderItems);
+    batch.execute(_createPayments);
+    batch.execute(_createInventoryItems);
+    batch.execute(_createInventoryLogs);
+    batch.execute(_createSettings);
+    await batch.commit(noResult: true);
     await _seedDefaultSettings(db);
   }
 
@@ -47,9 +49,14 @@ class DatabaseHelper {
       AppConstants.settingReceiptHeader: 'Thank you for visiting!',
       AppConstants.settingReceiptFooter: 'Please come again.',
       AppConstants.settingCurrencySymbol: AppConstants.defaultCurrencySymbol,
+      AppConstants.settingPosPrinterAddress: '',
+      AppConstants.settingPosPrinterName: '',
+      AppConstants.settingKitchenPrinterAddress: '',
+      AppConstants.settingKitchenPrinterName: '',
     };
     for (final entry in defaults.entries) {
-      await db.insert('settings', {'key': entry.key, 'value': entry.value});
+      await db.insert('settings', {'key': entry.key, 'value': entry.value},
+          conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 
@@ -58,6 +65,7 @@ class DatabaseHelper {
   static const _createCategories = '''
     CREATE TABLE categories (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid       TEXT    NOT NULL UNIQUE,
       name       TEXT    NOT NULL,
       icon       TEXT    NOT NULL DEFAULT 'restaurant',
       sort_order INTEGER NOT NULL DEFAULT 0,
@@ -67,14 +75,16 @@ class DatabaseHelper {
 
   static const _createMenuItems = '''
     CREATE TABLE menu_items (
-      id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      category_id  INTEGER NOT NULL,
-      name         TEXT    NOT NULL,
-      price        REAL    NOT NULL,
-      description  TEXT,
-      is_available INTEGER NOT NULL DEFAULT 1,
-      image_path   TEXT,
-      created_at   TEXT    NOT NULL,
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid          TEXT    NOT NULL UNIQUE,
+      category_id   INTEGER NOT NULL,
+      category_uuid TEXT    NOT NULL,
+      name          TEXT    NOT NULL,
+      price         REAL    NOT NULL,
+      description   TEXT,
+      is_available  INTEGER NOT NULL DEFAULT 1,
+      image_path    TEXT,
+      created_at    TEXT    NOT NULL,
       FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
     )
   ''';
@@ -82,6 +92,7 @@ class DatabaseHelper {
   static const _createTables = '''
     CREATE TABLE cafe_tables (
       id       INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid     TEXT    NOT NULL UNIQUE,
       name     TEXT    NOT NULL,
       capacity INTEGER NOT NULL DEFAULT 4,
       status   TEXT    NOT NULL DEFAULT 'free'
@@ -91,6 +102,7 @@ class DatabaseHelper {
   static const _createCustomers = '''
     CREATE TABLE customers (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid       TEXT NOT NULL UNIQUE,
       name       TEXT NOT NULL,
       phone      TEXT,
       address    TEXT,
@@ -101,9 +113,12 @@ class DatabaseHelper {
   static const _createOrders = '''
     CREATE TABLE orders (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid             TEXT    NOT NULL UNIQUE,
       type             TEXT    NOT NULL,
       table_id         INTEGER,
+      table_uuid       TEXT,
       customer_id      INTEGER,
+      customer_uuid    TEXT,
       delivery_address TEXT,
       status           TEXT    NOT NULL DEFAULT 'pending',
       discount_type    TEXT,
@@ -124,8 +139,11 @@ class DatabaseHelper {
   static const _createOrderItems = '''
     CREATE TABLE order_items (
       id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid           TEXT    NOT NULL UNIQUE,
       order_id       INTEGER NOT NULL,
+      order_uuid     TEXT    NOT NULL,
       menu_item_id   INTEGER NOT NULL,
+      menu_item_uuid TEXT    NOT NULL,
       name_snapshot  TEXT    NOT NULL,
       price_snapshot REAL    NOT NULL,
       quantity       INTEGER NOT NULL DEFAULT 1,
@@ -137,7 +155,9 @@ class DatabaseHelper {
   static const _createPayments = '''
     CREATE TABLE payments (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid            TEXT    NOT NULL UNIQUE,
       order_id        INTEGER NOT NULL UNIQUE,
+      order_uuid      TEXT    NOT NULL,
       method          TEXT    NOT NULL,
       amount_tendered REAL    NOT NULL,
       change_amount   REAL    NOT NULL DEFAULT 0,
@@ -149,6 +169,7 @@ class DatabaseHelper {
   static const _createInventoryItems = '''
     CREATE TABLE inventory_items (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid                TEXT NOT NULL UNIQUE,
       name                TEXT NOT NULL,
       unit                TEXT NOT NULL,
       quantity            REAL NOT NULL DEFAULT 0,
@@ -159,11 +180,13 @@ class DatabaseHelper {
 
   static const _createInventoryLogs = '''
     CREATE TABLE inventory_logs (
-      id                INTEGER PRIMARY KEY AUTOINCREMENT,
-      inventory_item_id INTEGER NOT NULL,
-      change_amount     REAL    NOT NULL,
-      reason            TEXT,
-      created_at        TEXT    NOT NULL,
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid                TEXT    NOT NULL UNIQUE,
+      inventory_item_id   INTEGER NOT NULL,
+      inventory_item_uuid TEXT    NOT NULL,
+      change_amount       REAL    NOT NULL,
+      reason              TEXT,
+      created_at          TEXT    NOT NULL,
       FOREIGN KEY (inventory_item_id) REFERENCES inventory_items (id) ON DELETE CASCADE
     )
   ''';
@@ -175,11 +198,12 @@ class DatabaseHelper {
     )
   ''';
 
-  // ── Helper methods ───────────────────────────────────────────────────
+  // ── Generic helpers ──────────────────────────────────────────────────
 
-  Future<int> insert(String table, Map<String, dynamic> data) async {
+  Future<int> insert(String table, Map<String, dynamic> data,
+      {ConflictAlgorithm conflictAlgorithm = ConflictAlgorithm.replace}) async {
     final db = await database;
-    return db.insert(table, data, conflictAlgorithm: ConflictAlgorithm.replace);
+    return db.insert(table, data, conflictAlgorithm: conflictAlgorithm);
   }
 
   Future<int> update(
@@ -192,11 +216,7 @@ class DatabaseHelper {
     return db.update(table, data, where: where, whereArgs: whereArgs);
   }
 
-  Future<int> delete(
-    String table,
-    String where,
-    List<dynamic> whereArgs,
-  ) async {
+  Future<int> delete(String table, String where, List<dynamic> whereArgs) async {
     final db = await database;
     return db.delete(table, where: where, whereArgs: whereArgs);
   }
@@ -207,23 +227,26 @@ class DatabaseHelper {
     List<dynamic>? whereArgs,
     String? orderBy,
     int? limit,
+    int? offset,
   }) async {
     final db = await database;
-    return db.query(
-      table,
-      where: where,
-      whereArgs: whereArgs,
-      orderBy: orderBy,
-      limit: limit,
-    );
+    return db.query(table,
+        where: where,
+        whereArgs: whereArgs,
+        orderBy: orderBy,
+        limit: limit,
+        offset: offset);
   }
 
-  Future<List<Map<String, dynamic>>> rawQuery(
-    String sql, [
-    List<dynamic>? args,
-  ]) async {
+  Future<List<Map<String, dynamic>>> rawQuery(String sql,
+      [List<dynamic>? args]) async {
     final db = await database;
     return db.rawQuery(sql, args);
+  }
+
+  Future<T> transaction<T>(Future<T> Function(Transaction txn) action) async {
+    final db = await database;
+    return db.transaction(action);
   }
 
   Future<void> close() async {

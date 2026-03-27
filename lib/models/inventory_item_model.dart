@@ -1,7 +1,9 @@
+import 'package:uuid/uuid.dart';
 import '../core/utils/date_helpers.dart';
 
 class InventoryItemModel {
   final int? id;
+  final String uuid;
   final String name;
   final String unit;
   final double quantity;
@@ -10,6 +12,7 @@ class InventoryItemModel {
 
   const InventoryItemModel({
     this.id,
+    required this.uuid,
     required this.name,
     required this.unit,
     this.quantity = 0,
@@ -17,11 +20,11 @@ class InventoryItemModel {
     required this.updatedAt,
   });
 
-  bool get isLowStock =>
-      lowStockThreshold > 0 && quantity <= lowStockThreshold;
+  bool get isLowStock => lowStockThreshold > 0 && quantity <= lowStockThreshold;
 
   InventoryItemModel copyWith({
     int? id,
+    String? uuid,
     String? name,
     String? unit,
     double? quantity,
@@ -30,6 +33,7 @@ class InventoryItemModel {
   }) {
     return InventoryItemModel(
       id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
       name: name ?? this.name,
       unit: unit ?? this.unit,
       quantity: quantity ?? this.quantity,
@@ -40,6 +44,7 @@ class InventoryItemModel {
 
   Map<String, dynamic> toMap() => {
         if (id != null) 'id': id,
+        'uuid': uuid,
         'name': name,
         'unit': unit,
         'quantity': quantity,
@@ -49,11 +54,27 @@ class InventoryItemModel {
 
   factory InventoryItemModel.fromMap(Map<String, dynamic> map) =>
       InventoryItemModel(
-        id: map['id'] as int,
+        id: map['id'] as int?,
+        uuid: map['uuid'] as String,
         name: map['name'] as String,
         unit: map['unit'] as String,
         quantity: (map['quantity'] as num?)?.toDouble() ?? 0,
         lowStockThreshold: (map['low_stock_threshold'] as num?)?.toDouble() ?? 0,
         updatedAt: DateHelpers.fromIso(map['updated_at'] as String),
+      );
+
+  factory InventoryItemModel.create({
+    required String name,
+    required String unit,
+    double quantity = 0,
+    double lowStockThreshold = 0,
+  }) =>
+      InventoryItemModel(
+        uuid: const Uuid().v4(),
+        name: name,
+        unit: unit,
+        quantity: quantity,
+        lowStockThreshold: lowStockThreshold,
+        updatedAt: DateTime.now(),
       );
 }

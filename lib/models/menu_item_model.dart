@@ -1,8 +1,11 @@
+import 'package:uuid/uuid.dart';
 import '../core/utils/date_helpers.dart';
 
 class MenuItemModel {
   final int? id;
+  final String uuid;
   final int categoryId;
+  final String categoryUuid;
   final String name;
   final double price;
   final String? description;
@@ -12,7 +15,9 @@ class MenuItemModel {
 
   const MenuItemModel({
     this.id,
+    required this.uuid,
     required this.categoryId,
+    required this.categoryUuid,
     required this.name,
     required this.price,
     this.description,
@@ -23,7 +28,9 @@ class MenuItemModel {
 
   MenuItemModel copyWith({
     int? id,
+    String? uuid,
     int? categoryId,
+    String? categoryUuid,
     String? name,
     double? price,
     String? description,
@@ -33,7 +40,9 @@ class MenuItemModel {
   }) {
     return MenuItemModel(
       id: id ?? this.id,
+      uuid: uuid ?? this.uuid,
       categoryId: categoryId ?? this.categoryId,
+      categoryUuid: categoryUuid ?? this.categoryUuid,
       name: name ?? this.name,
       price: price ?? this.price,
       description: description ?? this.description,
@@ -45,7 +54,9 @@ class MenuItemModel {
 
   Map<String, dynamic> toMap() => {
         if (id != null) 'id': id,
+        'uuid': uuid,
         'category_id': categoryId,
+        'category_uuid': categoryUuid,
         'name': name,
         'price': price,
         'description': description,
@@ -55,8 +66,10 @@ class MenuItemModel {
       };
 
   factory MenuItemModel.fromMap(Map<String, dynamic> map) => MenuItemModel(
-        id: map['id'] as int,
+        id: map['id'] as int?,
+        uuid: map['uuid'] as String,
         categoryId: map['category_id'] as int,
+        categoryUuid: map['category_uuid'] as String? ?? '',
         name: map['name'] as String,
         price: (map['price'] as num).toDouble(),
         description: map['description'] as String?,
@@ -67,12 +80,15 @@ class MenuItemModel {
 
   factory MenuItemModel.create({
     required int categoryId,
+    required String categoryUuid,
     required String name,
     required double price,
     String? description,
   }) =>
       MenuItemModel(
+        uuid: const Uuid().v4(),
         categoryId: categoryId,
+        categoryUuid: categoryUuid,
         name: name,
         price: price,
         description: description,
