@@ -86,6 +86,8 @@ class PdfReceiptService {
           _infoRow(reg, bold, 'Order', order.displayId),
           _infoRow(reg, bold, 'Date', _fmtDt(order.createdAt)),
           _infoRow(reg, bold, 'Type', _typeLabel(order.type)),
+          if (order.isDineIn && order.tableName != null)
+            _infoRow(reg, bold, 'Table', order.tableName!),
           if (order.customerName != null)
             _infoRow(reg, bold, 'Customer', order.customerName!),
           if (order.deliveryAddress != null &&
