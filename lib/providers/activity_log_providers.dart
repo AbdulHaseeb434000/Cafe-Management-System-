@@ -6,6 +6,8 @@ final activityLogRepositoryProvider = Provider<ActivityLogRepository>(
   (_) => ActivityLogRepository.instance,
 );
 
-final activityLogsProvider = FutureProvider<List<ActivityLogModel>>((ref) {
+// autoDispose ensures a fresh fetch each time the screen is opened
+final activityLogsProvider =
+    FutureProvider.autoDispose<List<ActivityLogModel>>((ref) {
   return ref.watch(activityLogRepositoryProvider).getAll();
 });

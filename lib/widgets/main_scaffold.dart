@@ -48,6 +48,13 @@ class MainScaffold extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 48,
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu),
+            tooltip: 'More',
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
         title: Text(
           _navItems.firstWhere((e) => path.startsWith(e.path),
                   orElse: () => _railExtras.firstWhere(
@@ -59,15 +66,7 @@ class MainScaffold extends StatelessWidget {
               .titleMedium
               ?.copyWith(fontWeight: FontWeight.w600),
         ),
-        actions: [
-          Builder(
-            builder: (ctx) => IconButton(
-              icon: const Icon(Icons.menu),
-              tooltip: 'More',
-              onPressed: () => Scaffold.of(ctx).openDrawer(),
-            ),
-          ),
-        ],
+      ),
       ),
       body: child,
       bottomNavigationBar: Container(

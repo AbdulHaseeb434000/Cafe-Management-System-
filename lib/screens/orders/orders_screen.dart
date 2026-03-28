@@ -27,8 +27,9 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
   void initState() {
     super.initState();
     _tab = TabController(length: 2, vsync: this);
+    // Always reload history when switching to the History tab
     _tab.addListener(() {
-      if (_tab.index == 1 && _history.isEmpty) _loadHistory();
+      if (_tab.index == 1) _loadHistory();
     });
   }
 
@@ -91,21 +92,24 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
             ),
           ),
           // History
-          _loadingHistory
-              ? const Center(child: CircularProgressIndicator())
-              : _history.isEmpty
-                  ? EmptyState(
-                      icon: Icons.history_outlined,
-                      title: 'No order history',
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: _history.length,
-                      separatorBuilder: (_, __) =>
-                          const Divider(height: 1, indent: 16),
-                      itemBuilder: (_, i) =>
-                          _OrderTile(order: _history[i]),
-                    ),
+          RefreshIndicator(
+            onRefresh: _loadHistory,
+            child: _loadingHistory
+                ? const Center(child: CircularProgressIndicator())
+                : _history.isEmpty
+                    ? EmptyState(
+                        icon: Icons.history_outlined,
+                        title: 'No order history',
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: _history.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1, indent: 16),
+                        itemBuilder: (_, i) =>
+                            _OrderTile(order: _history[i]),
+                      ),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -125,45 +129,46 @@ class _OrderTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       onTap: () => context.push('/orders/${order.id}'),
+      // Title row: order ID on left, total on right — both always have room
       title: Row(
         children: [
           Text(
             order.displayId,
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const Spacer(),
+          Text(
+            CurrencyFormatter.format(order.total),
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: AppColors.primaryDark,
                   fontWeight: FontWeight.w700,
                 ),
           ),
-          const SizedBox(width: 6),
-          OrderTypeBadge(type: order.type, small: true),
-          const SizedBox(width: 4),
-          Flexible(child: OrderStatusBadge(status: order.status)),
         ],
       ),
+      // Subtitle: badges + time wrapped so they never overlap
       subtitle: Padding(
         padding: const EdgeInsets.only(top: 4),
-        child: Text(
-          '${order.displayLabel} · ${DateHelpers.formatTime(order.createdAt)}',
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: AppColors.textSecondary),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
-      trailing: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 90),
-        child: Text(
-          CurrencyFormatter.format(order.total),
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: AppColors.primaryDark,
-                fontWeight: FontWeight.w700,
-              ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.end,
+        child: Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            OrderTypeBadge(type: order.type, small: true),
+            OrderStatusBadge(status: order.status),
+            Text(
+              '${order.displayLabel} · ${DateHelpers.formatTime(order.createdAt)}',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
         ),
       ),
     );

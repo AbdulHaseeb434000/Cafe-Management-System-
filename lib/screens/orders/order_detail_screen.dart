@@ -55,6 +55,12 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
       appBar: AppBar(
         title: Text(order.displayId),
         actions: [
+          if (order.status == AppConstants.orderStatusCompleted)
+            IconButton(
+              icon: const Icon(Icons.print_outlined),
+              tooltip: 'Reprint Receipt',
+              onPressed: () => _reprintReceipt(order),
+            ),
           if (order.isActive)
             PopupMenuButton<String>(
               onSelected: (v) => _handleAction(v, order),
@@ -207,6 +213,43 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _reprintReceipt(OrderModel order) async {
+    final settings = ref.read(settingsNotifierProvider).valueOrNull ?? {};
+    final addr = settings[AppConstants.settingPosPrinterAddress] ?? '';
+    if (addr.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('POS printer not configured in Settings')),
+        );
+      }
+      return;
+    }
+    final payment =
+        await ref.read(paymentRepositoryProvider).getByOrderId(order.id!);
+    if (payment == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No payment record found for this order')),
+        );
+      }
+      return;
+    }
+    await PrinterService.instance.printReceipt(
+      order: order,
+      payment: payment,
+      cafeName: settings[AppConstants.settingCafeName] ?? 'My Cafe',
+      cafeAddress: settings[AppConstants.settingCafeAddress] ?? '',
+      cafePhone: settings[AppConstants.settingCafePhone] ?? '',
+      header: settings[AppConstants.settingReceiptHeader] ?? '',
+      footer: settings[AppConstants.settingReceiptFooter] ?? '',
+      currencySymbol: settings[AppConstants.settingCurrencySymbol] ??
+          AppConstants.defaultCurrencySymbol,
+      printerAddress: addr,
+      logoPath: settings[AppConstants.settingLogoPath] ?? '',
     );
   }
 

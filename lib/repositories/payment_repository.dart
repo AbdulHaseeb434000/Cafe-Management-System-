@@ -11,12 +11,15 @@ class PaymentRepository {
 
   Future<PaymentModel> insert(PaymentModel payment) async {
     final id = await _db.insert(_table, payment.toMap());
+    // Log the actual order amount (tendered minus change), not the tendered amount
+    final orderAmount = payment.amountTendered - payment.changeAmount;
+    final methodLabel =
+        '${payment.method[0].toUpperCase()}${payment.method.substring(1)}';
     ActivityLogRepository.instance.log(
       actionType: 'payment_received',
       entityType: 'payment',
       entityName: 'Order #${payment.orderUuid.substring(0, 8).toUpperCase()}',
-      details:
-          '${payment.method[0].toUpperCase()}${payment.method.substring(1)} — ${payment.amountTendered.toStringAsFixed(2)}',
+      details: '$methodLabel — ${orderAmount.toStringAsFixed(2)}',
     );
     return payment.copyWith(id: id);
   }
