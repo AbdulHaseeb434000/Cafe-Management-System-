@@ -28,6 +28,9 @@ class OrderModel {
   final List<OrderItemModel> items;
   final String? tableName;
   final String? customerName;
+  /// Item count populated by history queries via a COUNT subquery.
+  /// Null when items are fully loaded instead (active/detail screens).
+  final int? itemCount;
 
   const OrderModel({
     this.id,
@@ -52,6 +55,7 @@ class OrderModel {
     this.items = const [],
     this.tableName,
     this.customerName,
+    this.itemCount,
   });
 
   bool get isDineIn => type == AppConstants.orderTypeDineIn;
@@ -95,6 +99,7 @@ class OrderModel {
     List<OrderItemModel>? items,
     String? tableName,
     String? customerName,
+    int? itemCount,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -119,6 +124,7 @@ class OrderModel {
       items: items ?? this.items,
       tableName: tableName ?? this.tableName,
       customerName: customerName ?? this.customerName,
+      itemCount: itemCount ?? this.itemCount,
     );
   }
 
@@ -168,6 +174,7 @@ class OrderModel {
             : null,
         tableName: map['table_name'] as String?,
         customerName: map['customer_name'] as String?,
+        itemCount: (map['item_count'] as num?)?.toInt(),
       );
 
   factory OrderModel.create({required String type, String uuid = ''}) =>

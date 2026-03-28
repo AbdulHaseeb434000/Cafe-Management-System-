@@ -34,7 +34,7 @@ class OrderRepository {
     int limit = 100,
     int offset = 0,
   }) async {
-    String where = "o.status = 'completed'";
+    String where = "o.status IN ('completed', 'cancelled')";
     final args = <dynamic>[];
     if (from != null) {
       where += ' AND o.created_at >= ?';
@@ -47,7 +47,8 @@ class OrderRepository {
     final rows = await _db.rawQuery('''
       SELECT o.*,
              t.name AS table_name,
-             c.name AS customer_name
+             c.name AS customer_name,
+             (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count
       FROM orders o
       LEFT JOIN cafe_tables t ON t.id = o.table_id
       LEFT JOIN customers   c ON c.id = o.customer_id
@@ -289,6 +290,37 @@ class OrderRepository {
       WHERE status = 'completed'
         AND created_at BETWEEN ? AND ?
       GROUP BY type
+    ''', [from.toIso8601String(), to.toIso8601String()]);
+  }
+
+  /// Returns raw rows for CSV export — includes items_summary via GROUP_CONCAT.
+  Future<List<Map<String, dynamic>>> getHistoryForExport({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    return _db.rawQuery('''
+      SELECT o.id,
+             o.type,
+             o.status,
+             o.subtotal,
+             o.discount_amount,
+             o.tax_amount,
+             o.total,
+             o.created_at,
+             t.name  AS table_name,
+             c.name  AS customer_name,
+             COALESCE(
+               GROUP_CONCAT(oi.quantity || 'x ' || oi.name_snapshot, ' | '),
+               ''
+             ) AS items_summary
+      FROM orders o
+      LEFT JOIN cafe_tables  t  ON t.id  = o.table_id
+      LEFT JOIN customers    c  ON c.id  = o.customer_id
+      LEFT JOIN order_items  oi ON oi.order_id = o.id
+      WHERE o.status IN ('completed', 'cancelled')
+        AND o.created_at BETWEEN ? AND ?
+      GROUP BY o.id
+      ORDER BY o.created_at DESC
     ''', [from.toIso8601String(), to.toIso8601String()]);
   }
 

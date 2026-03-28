@@ -36,4 +36,12 @@ class DateHelpers {
 
   static DateTime monthEnd(DateTime date) =>
       DateTime(date.year, date.month + 1, 0, 23, 59, 59, 999);
+
+  static DateTime yearStart(DateTime date) => DateTime(date.year, 1, 1);
+
+  static DateTime yearEnd(DateTime date) =>
+      DateTime(date.year, 12, 31, 23, 59, 59, 999);
+
+  /// A very early sentinel date used when querying with no lower-bound filter.
+  static DateTime get epochStart => DateTime(2020, 1, 1);
 }
