@@ -382,7 +382,8 @@ class _ItemTile extends ConsumerWidget {
           const SizedBox(width: 8),
           Switch.adaptive(
             value: item.isAvailable,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
+            activeTrackColor: AppColors.primary.withValues(alpha: 0.5),
             onChanged: (v) => ref
                 .read(menuItemsProvider.notifier)
                 .toggleAvailability(item.id!, v),

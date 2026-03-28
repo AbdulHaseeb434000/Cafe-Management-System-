@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
@@ -44,9 +43,11 @@ class BackupService {
     final file = File('${dir.path}/$fileName');
     await file.writeAsString(json, encoding: utf8);
 
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/json')],
-      subject: 'CafeDesk Backup - $fileName',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path, mimeType: 'application/json')],
+        subject: 'CafeDesk Backup - $fileName',
+      ),
     );
   }
 

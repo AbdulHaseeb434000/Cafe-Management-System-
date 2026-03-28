@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
-import '../../models/category_model.dart';
 import '../../models/customer_model.dart';
 import '../../models/menu_item_model.dart';
 import '../../models/order_model.dart';

@@ -7,6 +7,7 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_helpers.dart';
 import '../../models/order_model.dart';
 import '../../providers/order_providers.dart';
+import '../../providers/settings_providers.dart';
 import '../../providers/table_providers.dart';
 import '../../providers/repository_providers.dart';
 import '../../services/printer/printer_service.dart';

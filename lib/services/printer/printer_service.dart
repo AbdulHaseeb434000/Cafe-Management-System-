@@ -250,7 +250,7 @@ class PrinterService {
             styles: const PosStyles(height: PosTextSize.size2)));
         if (item.note != null && item.note!.isNotEmpty) {
           bytes.addAll(generator.text('   Note: ${item.note}',
-              styles: const PosStyles(italic: true)));
+              styles: const PosStyles(bold: false)));
         }
       }
 

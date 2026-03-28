@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:intl/intl.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_helpers.dart';
 import '../../providers/repository_providers.dart';
-import '../../providers/settings_providers.dart';
 
 enum _Range { today, week, month, custom }
 
@@ -378,7 +376,7 @@ class _TopItemsChart extends StatelessWidget {
     final maxQty = items.fold<double>(
         0,
         (m, e) =>
-            (e['total_qty'] as num?)?.toDouble() ?? 0 > m
+            ((e['total_qty'] as num?)?.toDouble() ?? 0) > m
                 ? (e['total_qty'] as num).toDouble()
                 : m);
 

@@ -5,7 +5,6 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/table_model.dart';
 import '../../providers/table_providers.dart';
-import '../../providers/order_providers.dart';
 import '../../providers/repository_providers.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/confirm_dialog.dart';
