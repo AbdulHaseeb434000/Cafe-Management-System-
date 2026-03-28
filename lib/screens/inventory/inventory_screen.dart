@@ -370,7 +370,7 @@ class _InventoryTile extends StatelessWidget {
         height: 44,
         decoration: BoxDecoration(
           color: isLow
-              ? AppColors.warning.withOpacity(0.15)
+              ? AppColors.warning.withValues(alpha: 0.15)
               : AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(10),
         ),
@@ -438,7 +438,7 @@ class _LogTile extends StatelessWidget {
       leading: CircleAvatar(
         radius: 16,
         backgroundColor: (isAdd ? AppColors.success : AppColors.error)
-            .withOpacity(0.15),
+            .withValues(alpha: 0.15),
         child: Icon(
           isAdd ? Icons.add : Icons.remove,
           size: 16,
@@ -481,7 +481,7 @@ class _SegmentButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 8),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: selected ? color.withOpacity(0.15) : AppColors.surfaceVariant,
+            color: selected ? color.withValues(alpha: 0.15) : AppColors.surfaceVariant,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
                 color: selected ? color : AppColors.border),

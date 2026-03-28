@@ -2,9 +2,9 @@ include: package:flutter_lints/flutter.yaml
 
 linter:
   rules:
-    - avoid_unnecessary_containers
-    - use_key_in_widget_constructors
-    - prefer_single_quotes
+    avoid_unnecessary_containers: true
+    use_key_in_widget_constructors: true
+    prefer_single_quotes: true
     prefer_const_constructors: false
     prefer_const_literals_to_create_immutables: false
 
@@ -14,5 +14,3 @@ analyzer:
     deprecated_member_use: ignore
     deprecated_member_use_from_same_package: ignore
     use_build_context_synchronously: ignore
-    prefer_const_constructors: ignore
-    prefer_const_literals_to_create_immutables: ignore

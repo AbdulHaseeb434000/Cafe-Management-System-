@@ -270,7 +270,7 @@ class _TableCard extends StatelessWidget {
           border: Border.all(color: _statusColor, width: 2),
           boxShadow: [
             BoxShadow(
-              color: _statusColor.withOpacity(0.1),
+              color: _statusColor.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -283,7 +283,7 @@ class _TableCard extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: _statusColor.withOpacity(0.15),
+                color: _statusColor.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.table_restaurant,

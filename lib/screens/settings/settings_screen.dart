@@ -289,7 +289,7 @@ class _PrinterTile extends ConsumerWidget {
                 title: Text(d.name),
                 subtitle: Text(d.macAdress),
                 selected: currentAddress == d.macAdress,
-                selectedTileColor: AppColors.primaryLight.withOpacity(0.2),
+                selectedTileColor: AppColors.primaryLight.withValues(alpha: 0.2),
                 onTap: () {
                   ref
                       .read(settingsNotifierProvider.notifier)
@@ -604,10 +604,10 @@ class _BackupRestoreSectionState
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.warning.withOpacity(0.1),
+                  color: AppColors.warning.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: AppColors.warning.withOpacity(0.4)),
+                      color: AppColors.warning.withValues(alpha: 0.4)),
                 ),
                 child: const Text(
                   '⚠ Full Replace will erase all current data.',

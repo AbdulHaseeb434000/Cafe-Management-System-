@@ -125,7 +125,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                               height: 28,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
-                                color: AppColors.primaryLight.withOpacity(0.3),
+                                color: AppColors.primaryLight.withValues(alpha: 0.3),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text('${item.quantity}',

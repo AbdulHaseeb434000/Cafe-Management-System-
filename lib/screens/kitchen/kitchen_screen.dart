@@ -179,7 +179,7 @@ class _KitchenCard extends ConsumerWidget {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: isUrgent
-                  ? AppColors.error.withOpacity(0.08)
+                  ? AppColors.error.withValues(alpha: 0.08)
                   : AppColors.surfaceVariant,
               borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(11)),
@@ -238,7 +238,7 @@ class _KitchenCard extends ConsumerWidget {
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color:
-                                    AppColors.primary.withOpacity(0.15),
+                                    AppColors.primary.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text('${item.quantity}',

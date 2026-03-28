@@ -164,7 +164,7 @@ class AppTheme {
           color: AppColors.textSecondary,
           fontSize: 12,
         ),
-        indicatorColor: AppColors.primaryLight.withOpacity(0.3),
+        indicatorColor: AppColors.primaryLight.withValues(alpha: 0.3),
       ),
       dividerTheme: const DividerThemeData(
         color: AppColors.divider,

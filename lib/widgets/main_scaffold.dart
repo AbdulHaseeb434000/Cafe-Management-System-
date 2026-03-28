@@ -164,7 +164,7 @@ class MainScaffold extends StatelessWidget {
                       ),
                 ),
                 selected: path.startsWith(e.path),
-                selectedTileColor: AppColors.primaryLight.withOpacity(0.2),
+                selectedTileColor: AppColors.primaryLight.withValues(alpha: 0.2),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 onTap: () {
                   Navigator.of(context).pop();

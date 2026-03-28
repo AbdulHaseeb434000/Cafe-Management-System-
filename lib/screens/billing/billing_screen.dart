@@ -295,11 +295,11 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.success.withOpacity(0.1),
+                          color: AppColors.success.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                               color:
-                                  AppColors.success.withOpacity(0.3)),
+                                  AppColors.success.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           mainAxisAlignment:
