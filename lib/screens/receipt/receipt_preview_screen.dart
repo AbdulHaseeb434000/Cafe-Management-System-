@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 
 /// Full-screen PDF preview sized as a thermal receipt strip.
@@ -22,7 +21,7 @@ class ReceiptPreviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Keep the preview page narrow so it looks like a receipt strip,
+    // Constrain preview width so it looks like a receipt strip,
     // not a stretched full-page document.
     final screenWidth = MediaQuery.of(context).size.width;
     final receiptWidth = (screenWidth * 0.65).clamp(220.0, 340.0);
@@ -38,19 +37,18 @@ class ReceiptPreviewScreen extends StatelessWidget {
         title: const Text('Receipt Preview'),
       ),
       body: PdfPreview(
+        // Return pre-built bytes. PdfPreview reads the embedded page
+        // dimensions from the PDF itself — do NOT pass an initialPageFormat
+        // with double.infinity height or the widget renders blank.
         build: (_) => pdfBytes,
         pdfFileName: filename,
         allowPrinting: true,
         allowSharing: true,
         canChangeOrientation: false,
         canChangePageFormat: false,
-        // Constrains how wide the page renders in the preview widget —
-        // this is the key setting that makes the receipt look narrow.
+        // Key: constrains how wide the page renders in the preview so
+        // the receipt looks narrow like actual thermal paper.
         maxPageWidth: receiptWidth,
-        initialPageFormat: PdfPageFormat(
-          80 * PdfPageFormat.mm,
-          double.infinity,
-        ),
         scrollViewDecoration: const BoxDecoration(
           color: Color(0xFFD0D0D0),
         ),
