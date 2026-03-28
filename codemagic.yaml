@@ -30,15 +30,8 @@ workflows:
             --release \
             --build-name=1.0.0 \
             --build-number=$BUILD_NUMBER
-      - name: Build AAB (release)
-        script: |
-          flutter build appbundle \
-            --release \
-            --build-name=1.0.0 \
-            --build-number=$BUILD_NUMBER
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
-      - build/app/outputs/bundle/release/app-release.aab
       - flutter_drive.log
     publishing:
       email:
