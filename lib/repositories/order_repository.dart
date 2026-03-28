@@ -3,6 +3,7 @@ import '../core/database/database_helper.dart';
 import '../core/constants/app_constants.dart';
 import '../models/order_model.dart';
 import '../models/order_item_model.dart';
+import 'activity_log_repository.dart';
 
 class OrderRepository {
   final DatabaseHelper _db;
@@ -92,7 +93,14 @@ class OrderRepository {
 
   Future<OrderModel> insert(OrderModel order) async {
     final id = await _db.insert(_ordersTable, order.toMap());
-    return order.copyWith(id: id);
+    final saved = order.copyWith(id: id);
+    ActivityLogRepository.instance.log(
+      actionType: 'order_created',
+      entityType: 'order',
+      entityName: saved.displayId,
+      details: _typeLabel(order.type),
+    );
+    return saved;
   }
 
   Future<void> update(OrderModel order) async {
@@ -105,6 +113,20 @@ class OrderRepository {
       data['completed_at'] = DateTime.now().toIso8601String();
     }
     await _db.update(_ordersTable, data, 'id = ?', [id]);
+    if (status == AppConstants.orderStatusCompleted ||
+        status == AppConstants.orderStatusCancelled) {
+      final order = await getById(id);
+      if (order != null) {
+        ActivityLogRepository.instance.log(
+          actionType: status == AppConstants.orderStatusCompleted
+              ? 'order_completed'
+              : 'order_cancelled',
+          entityType: 'order',
+          entityName: order.displayId,
+          details: _typeLabel(order.type),
+        );
+      }
+    }
   }
 
   Future<void> updateTotals(OrderModel order) async {
@@ -120,6 +142,14 @@ class OrderRepository {
   }
 
   Future<void> cancel(int id) => updateStatus(id, AppConstants.orderStatusCancelled);
+
+  String _typeLabel(String type) {
+    return switch (type) {
+      'dine_in' => 'Dine-In',
+      'delivery' => 'Delivery',
+      _ => 'Takeaway',
+    };
+  }
 
   // ── Order items ──────────────────────────────────────────────────────
 

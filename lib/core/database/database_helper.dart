@@ -20,6 +20,7 @@ class DatabaseHelper {
       path,
       version: AppConstants.dbVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
       onConfigure: (db) async => await db.execute('PRAGMA foreign_keys = ON'),
     );
   }
@@ -36,8 +37,15 @@ class DatabaseHelper {
     batch.execute(_createInventoryItems);
     batch.execute(_createInventoryLogs);
     batch.execute(_createSettings);
+    batch.execute(_createActivityLogs);
     await batch.commit(noResult: true);
     await _seedDefaultSettings(db);
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute(_createActivityLogs);
+    }
   }
 
   Future<void> _seedDefaultSettings(Database db) async {
@@ -195,6 +203,18 @@ class DatabaseHelper {
     CREATE TABLE settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
+    )
+  ''';
+
+  static const _createActivityLogs = '''
+    CREATE TABLE activity_logs (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid        TEXT    NOT NULL UNIQUE,
+      action_type TEXT    NOT NULL,
+      entity_type TEXT    NOT NULL,
+      entity_name TEXT    NOT NULL,
+      details     TEXT,
+      created_at  TEXT    NOT NULL
     )
   ''';
 

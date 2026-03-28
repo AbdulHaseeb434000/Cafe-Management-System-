@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import '../core/database/database_helper.dart';
 import '../models/payment_model.dart';
+import 'activity_log_repository.dart';
 
 class PaymentRepository {
   final DatabaseHelper _db;
@@ -10,6 +11,13 @@ class PaymentRepository {
 
   Future<PaymentModel> insert(PaymentModel payment) async {
     final id = await _db.insert(_table, payment.toMap());
+    ActivityLogRepository.instance.log(
+      actionType: 'payment_received',
+      entityType: 'payment',
+      entityName: 'Order #${payment.orderUuid.substring(0, 8).toUpperCase()}',
+      details:
+          '${payment.method[0].toUpperCase()}${payment.method.substring(1)} — ${payment.amountTendered.toStringAsFixed(2)}',
+    );
     return payment.copyWith(id: id);
   }
 
