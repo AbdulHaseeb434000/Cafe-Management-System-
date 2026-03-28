@@ -40,6 +40,36 @@ class ActivityLogRepository {
     return rows.map(ActivityLogModel.fromMap).toList();
   }
 
+  Future<List<ActivityLogModel>> getFiltered({
+    DateTime? from,
+    DateTime? to,
+    int limit = 2000,
+  }) async {
+    String? where;
+    List<dynamic>? args;
+    if (from != null && to != null) {
+      where = 'created_at >= ? AND created_at <= ?';
+      args = [from.toIso8601String(), _endOfDay(to).toIso8601String()];
+    } else if (from != null) {
+      where = 'created_at >= ?';
+      args = [from.toIso8601String()];
+    } else if (to != null) {
+      where = 'created_at <= ?';
+      args = [_endOfDay(to).toIso8601String()];
+    }
+    final rows = await _db.query(
+      _table,
+      where: where,
+      whereArgs: args,
+      orderBy: 'created_at DESC',
+      limit: limit,
+    );
+    return rows.map(ActivityLogModel.fromMap).toList();
+  }
+
+  DateTime _endOfDay(DateTime d) =>
+      DateTime(d.year, d.month, d.day, 23, 59, 59, 999);
+
   Future<void> clear() async {
     final db = await _db.database;
     await db.delete(_table);
