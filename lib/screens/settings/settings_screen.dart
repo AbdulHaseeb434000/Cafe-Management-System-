@@ -1,5 +1,8 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/date_helpers.dart';
@@ -32,6 +35,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         data: (settings) => ListView(
           children: [
             const SectionHeader(title: 'Cafe Info'),
+            _LogoTile(settings: settings),
             _SettingsTile(
               icon: Icons.store_outlined,
               label: 'Cafe Name',
@@ -288,6 +292,79 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 }
+
+// ── Logo Tile ─────────────────────────────────────────────────────────────────
+
+class _LogoTile extends ConsumerWidget {
+  final Map<String, String> settings;
+  const _LogoTile({required this.settings});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final logoPath = settings[AppConstants.settingLogoPath] ?? '';
+    final hasLogo = logoPath.isNotEmpty && File(logoPath).existsSync();
+
+    return ListTile(
+      leading: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: hasLogo
+            ? Image.file(File(logoPath),
+                width: 44, height: 44, fit: BoxFit.cover)
+            : Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Icon(Icons.image_outlined,
+                    color: AppColors.textSecondary, size: 22),
+              ),
+      ),
+      title: const Text('Restaurant Logo'),
+      subtitle: Text(
+        hasLogo ? 'Tap to change • shown on receipts' : 'Tap to upload logo',
+        style: Theme.of(context)
+            .textTheme
+            .bodySmall
+            ?.copyWith(color: AppColors.textSecondary),
+      ),
+      trailing: hasLogo
+          ? IconButton(
+              icon: const Icon(Icons.delete_outline,
+                  color: AppColors.error, size: 20),
+              tooltip: 'Remove logo',
+              onPressed: () => ref
+                  .read(settingsNotifierProvider.notifier)
+                  .set(AppConstants.settingLogoPath, ''),
+            )
+          : const Icon(Icons.chevron_right,
+              size: 18, color: AppColors.textSecondary),
+      onTap: () => _pickLogo(context, ref),
+    );
+  }
+
+  Future<void> _pickLogo(BuildContext context, WidgetRef ref) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final srcPath = result.files.first.path;
+    if (srcPath == null) return;
+
+    final docsDir = await getApplicationDocumentsDirectory();
+    final dest = File('${docsDir.path}/cafe_logo.jpg');
+    await File(srcPath).copy(dest.path);
+
+    ref
+        .read(settingsNotifierProvider.notifier)
+        .set(AppConstants.settingLogoPath, dest.path);
+  }
+}
+
+// ── Settings Tile ─────────────────────────────────────────────────────────────
 
 class _SettingsTile extends StatelessWidget {
   final IconData icon;

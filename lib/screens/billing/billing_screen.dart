@@ -580,6 +580,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       currencySymbol: settings[AppConstants.settingCurrencySymbol] ??
           AppConstants.defaultCurrencySymbol,
       printerAddress: addr,
+      logoPath: settings[AppConstants.settingLogoPath] ?? '',
     );
   }
 

@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:image/image.dart' as img;
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import '../../models/order_model.dart';
 import '../../models/payment_model.dart';
@@ -50,6 +52,7 @@ class PrinterService {
     required String footer,
     required String currencySymbol,
     required String printerAddress,
+    String logoPath = '',
   }) async {
     try {
       final connected = await connect(printerAddress);
@@ -60,6 +63,22 @@ class PrinterService {
       final bytes = <int>[];
 
       bytes.addAll(generator.setGlobalCodeTable('CP1252'));
+
+      // Print logo if set
+      if (logoPath.isNotEmpty) {
+        final logoFile = File(logoPath);
+        if (await logoFile.exists()) {
+          final rawBytes = await logoFile.readAsBytes();
+          final decoded = img.decodeImage(rawBytes);
+          if (decoded != null) {
+            final resized = img.copyResize(decoded, width: 200);
+            bytes.addAll(generator.image(resized,
+                align: PosAlign.center));
+            bytes.addAll(generator.emptyLines(1));
+          }
+        }
+      }
+
       bytes.addAll(generator.text(cafeName,
           styles: const PosStyles(
               bold: true,
