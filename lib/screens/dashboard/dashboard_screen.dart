@@ -34,7 +34,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Future<void> _loadStats() async {
     final stats = await ref
         .read(orderRepositoryProvider)
-        .getDailySummary(DateTime.now());
+        .getSummary(from: DateHelpers.todayStart, to: DateHelpers.todayEnd);
     if (mounted) setState(() { _todayStats = stats; _loadingStats = false; });
   }
 

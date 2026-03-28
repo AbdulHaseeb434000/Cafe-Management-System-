@@ -67,7 +67,6 @@ class MainScaffold extends StatelessWidget {
               ?.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
-      ),
       body: child,
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(

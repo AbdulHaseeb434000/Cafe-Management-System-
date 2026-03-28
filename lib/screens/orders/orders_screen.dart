@@ -291,10 +291,10 @@ class _HistoryTabState extends ConsumerState<_HistoryTab>
     final yesterday = today.subtract(const Duration(days: 1));
     if (dt.year == today.year &&
         dt.month == today.month &&
-        dt.day == today.day) return '__today__';
+        dt.day == today.day) { return '__today__'; }
     if (dt.year == yesterday.year &&
         dt.month == yesterday.month &&
-        dt.day == yesterday.day) return '__yesterday__';
+        dt.day == yesterday.day) { return '__yesterday__'; }
     return DateFormat('yyyy-MM-dd').format(dt);
   }
 
