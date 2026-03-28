@@ -27,7 +27,8 @@ class DateHelpers {
   }
 
   static DateTime weekStart(DateTime date) {
-    return date.subtract(Duration(days: date.weekday - 1));
+    final d = date.subtract(Duration(days: date.weekday - 1));
+    return DateTime(d.year, d.month, d.day);
   }
 
   static DateTime monthStart(DateTime date) =>

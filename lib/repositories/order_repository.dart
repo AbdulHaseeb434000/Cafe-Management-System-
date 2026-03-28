@@ -182,19 +182,65 @@ class OrderRepository {
 
   // ── Reports queries ──────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>> getDailySummary(DateTime date) async {
-    final start = DateTime(date.year, date.month, date.day).toIso8601String();
-    final end = DateTime(date.year, date.month, date.day, 23, 59, 59, 999).toIso8601String();
+  Future<Map<String, dynamic>> getSummary({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final f = from.toIso8601String();
+    final t = to.toIso8601String();
     final rows = await _db.rawQuery('''
       SELECT
-        COUNT(*)           AS order_count,
-        COALESCE(SUM(total), 0) AS revenue,
-        COALESCE(AVG(total), 0) AS avg_order
+        COUNT(CASE WHEN status = 'completed' THEN 1 END)               AS order_count,
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN total END), 0) AS revenue,
+        COALESCE(AVG(CASE WHEN status = 'completed' THEN total END), 0) AS avg_order,
+        COUNT(CASE WHEN status = 'cancelled' THEN 1 END)               AS cancelled_count
+      FROM orders
+      WHERE created_at BETWEEN ? AND ?
+    ''', [f, t]);
+    final result = Map<String, dynamic>.from(rows.first);
+    final itemRows = await _db.rawQuery('''
+      SELECT COALESCE(SUM(oi.quantity), 0) AS items_sold
+      FROM order_items oi
+      INNER JOIN orders o ON o.id = oi.order_id
+      WHERE o.status = 'completed'
+        AND o.created_at BETWEEN ? AND ?
+    ''', [f, t]);
+    result['items_sold'] = itemRows.first['items_sold'] ?? 0;
+    return result;
+  }
+
+  Future<List<Map<String, dynamic>>> getHourlyRevenue({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    return _db.rawQuery('''
+      SELECT
+        CAST(strftime('%H', created_at) AS INTEGER) AS hour,
+        COUNT(*)   AS order_count,
+        SUM(total) AS revenue
       FROM orders
       WHERE status = 'completed'
         AND created_at BETWEEN ? AND ?
-    ''', [start, end]);
-    return rows.first;
+      GROUP BY hour
+      ORDER BY hour ASC
+    ''', [from.toIso8601String(), to.toIso8601String()]);
+  }
+
+  Future<List<Map<String, dynamic>>> getPaymentSplit({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    return _db.rawQuery('''
+      SELECT p.method,
+             COUNT(*)          AS count,
+             COALESCE(SUM(o.total), 0) AS amount
+      FROM payments p
+      INNER JOIN orders o ON o.id = p.order_id
+      WHERE o.status = 'completed'
+        AND o.created_at BETWEEN ? AND ?
+      GROUP BY p.method
+      ORDER BY amount DESC
+    ''', [from.toIso8601String(), to.toIso8601String()]);
   }
 
   Future<List<Map<String, dynamic>>> getTopItems({
