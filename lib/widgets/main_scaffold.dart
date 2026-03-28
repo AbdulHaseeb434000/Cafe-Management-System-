@@ -12,13 +12,13 @@ class MainScaffold extends StatelessWidget {
     _NavItem(label: 'Orders', icon: Icons.receipt_long_outlined, activeIcon: Icons.receipt_long, path: '/orders'),
     _NavItem(label: 'Menu', icon: Icons.restaurant_menu_outlined, activeIcon: Icons.restaurant_menu, path: '/menu'),
     _NavItem(label: 'Tables', icon: Icons.table_restaurant_outlined, activeIcon: Icons.table_restaurant, path: '/tables'),
-    _NavItem(label: 'Kitchen', icon: Icons.soup_kitchen_outlined, activeIcon: Icons.soup_kitchen, path: '/kitchen'),
+    _NavItem(label: 'Settings', icon: Icons.settings_outlined, activeIcon: Icons.settings, path: '/settings'),
   ];
 
   static const _railExtras = [
+    _NavItem(label: 'Kitchen', icon: Icons.soup_kitchen_outlined, activeIcon: Icons.soup_kitchen, path: '/kitchen'),
     _NavItem(label: 'Inventory', icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2, path: '/inventory'),
     _NavItem(label: 'Reports', icon: Icons.bar_chart_outlined, activeIcon: Icons.bar_chart, path: '/reports'),
-    _NavItem(label: 'Settings', icon: Icons.settings_outlined, activeIcon: Icons.settings, path: '/settings'),
   ];
 
   String _currentPath(BuildContext context) =>
@@ -45,6 +45,29 @@ class MainScaffold extends StatelessWidget {
     final path = _currentPath(context);
     final idx = _bottomIndex(path);
     return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 48,
+        title: Text(
+          _navItems.firstWhere((e) => path.startsWith(e.path),
+                  orElse: () => _railExtras.firstWhere(
+                      (e) => path.startsWith(e.path),
+                      orElse: () => _navItems.first))
+              .label,
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium
+              ?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        actions: [
+          Builder(
+            builder: (ctx) => IconButton(
+              icon: const Icon(Icons.menu),
+              tooltip: 'More',
+              onPressed: () => Scaffold.of(ctx).openDrawer(),
+            ),
+          ),
+        ],
+      ),
       body: child,
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
