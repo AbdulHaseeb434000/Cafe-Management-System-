@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/order_model.dart';
-import '../models/order_item_model.dart';
 import '../models/menu_item_model.dart';
 import '../core/constants/app_constants.dart';
 import 'repository_providers.dart';

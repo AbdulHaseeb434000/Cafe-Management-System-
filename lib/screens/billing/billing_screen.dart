@@ -11,7 +11,6 @@ import '../../providers/table_providers.dart';
 import '../../providers/repository_providers.dart';
 import '../../providers/settings_providers.dart';
 import '../../services/printer/printer_service.dart';
-import '../../widgets/confirm_dialog.dart';
 
 class BillingScreen extends ConsumerStatefulWidget {
   final int orderId;
