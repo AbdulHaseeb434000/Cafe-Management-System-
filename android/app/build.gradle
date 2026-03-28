@@ -51,6 +51,9 @@ android {
 
     buildTypes {
         release {
+            // Sign with debug keystore so the APK can be installed directly on devices.
+            // Replace with a proper release keystore before publishing to Play Store.
+            signingConfig signingConfigs.debug
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
