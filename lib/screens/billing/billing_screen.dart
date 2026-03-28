@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/utils/date_helpers.dart';
 import '../../models/order_model.dart';
 import '../../models/payment_model.dart';
 import '../../providers/order_providers.dart';
@@ -51,13 +53,19 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
   Future<void> _load() async {
     final order =
         await ref.read(orderRepositoryProvider).getById(widget.orderId);
-    if (mounted) {
-      setState(() {
-        _order = order;
-        _loading = false;
-      });
-      _recalculate();
+    if (!mounted) return;
+    // Guard: if order is already completed/cancelled, leave billing screen
+    if (order == null ||
+        order.status == AppConstants.orderStatusCompleted ||
+        order.status == AppConstants.orderStatusCancelled) {
+      context.go('/orders');
+      return;
     }
+    setState(() {
+      _order = order;
+      _loading = false;
+    });
+    _recalculate();
   }
 
   double get _subtotal => _order?.subtotal ?? 0;
@@ -412,10 +420,9 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
 
     ref.read(activeOrdersProvider.notifier).load();
 
-    // Offer to print receipt
-    if (mounted) {
-      _showReceiptDialog(updated);
-    }
+    if (!mounted) return;
+    setState(() => _processing = false);
+    _showReceiptDialog(updated);
   }
 
   void _showReceiptDialog(OrderModel order) {
@@ -423,28 +430,121 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Payment Complete'),
-        content: const Text('Would you like to print a receipt?'),
+        title: Row(
+          children: [
+            const Icon(Icons.check_circle, color: AppColors.success, size: 22),
+            const SizedBox(width: 8),
+            const Text('Payment Complete'),
+          ],
+        ),
+        content: const Text('Receipt options:'),
         actions: [
+          // Skip — go to orders
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              context.pop();
+              context.go('/orders');
             },
             child: const Text('Skip'),
           ),
+          // Share as text
+          OutlinedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _shareReceipt(order);
+              if (mounted) context.go('/orders');
+            },
+            icon: const Icon(Icons.share, size: 16),
+            label: const Text('Share'),
+          ),
+          // Print
           ElevatedButton.icon(
             onPressed: () async {
               Navigator.pop(ctx);
               await _printReceipt(order);
-              if (mounted) context.pop();
+              if (mounted) context.go('/orders');
             },
             icon: const Icon(Icons.print, size: 16),
-            label: const Text('Print Receipt'),
+            label: const Text('Print'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _shareReceipt(OrderModel order) async {
+    final settings = ref.read(settingsNotifierProvider).valueOrNull ?? {};
+    final payment =
+        await ref.read(paymentRepositoryProvider).getByOrderId(order.id!);
+
+    final cafeName =
+        settings[AppConstants.settingCafeName] ?? 'My Cafe';
+    final cafeAddress = settings[AppConstants.settingCafeAddress] ?? '';
+    final cafePhone = settings[AppConstants.settingCafePhone] ?? '';
+    final header = settings[AppConstants.settingReceiptHeader] ?? '';
+    final footer = settings[AppConstants.settingReceiptFooter] ?? '';
+    final currency = settings[AppConstants.settingCurrencySymbol] ??
+        AppConstants.defaultCurrencySymbol;
+
+    final sep = '─' * 32;
+    final buf = StringBuffer();
+
+    buf.writeln(sep);
+    buf.writeln(cafeName.toUpperCase());
+    if (cafeAddress.isNotEmpty) buf.writeln(cafeAddress);
+    if (cafePhone.isNotEmpty) buf.writeln('Tel: $cafePhone');
+    if (header.isNotEmpty) buf.writeln(header);
+    buf.writeln(sep);
+    buf.writeln('Order : ${order.displayId}');
+    buf.writeln('Date  : ${DateHelpers.formatDateTime(order.createdAt)}');
+    buf.writeln('Type  : ${order.type.replaceAll('_', '-').toUpperCase()}');
+    if (order.displayLabel.isNotEmpty) buf.writeln('Info  : ${order.displayLabel}');
+    buf.writeln(sep);
+
+    for (final item in order.items) {
+      final name = item.nameSnapshot.length > 18
+          ? '${item.nameSnapshot.substring(0, 17)}…'
+          : item.nameSnapshot;
+      final price = '$currency${CurrencyFormatter.formatRaw(item.lineTotal)}';
+      final qty = '${item.quantity}x $name';
+      buf.writeln('${qty.padRight(24)}${price.padLeft(8)}');
+    }
+
+    buf.writeln(sep);
+    buf.writeln(
+        '${'Subtotal'.padRight(24)}${('$currency${CurrencyFormatter.formatRaw(_subtotal)}').padLeft(8)}');
+    if (_discountAmount > 0) {
+      buf.writeln(
+          '${'Discount'.padRight(24)}${('-$currency${CurrencyFormatter.formatRaw(_discountAmount)}').padLeft(8)}');
+    }
+    if (_taxAmount > 0) {
+      buf.writeln(
+          '${'Tax (${_taxPercent.toStringAsFixed(1)}%)'.padRight(24)}${('$currency${CurrencyFormatter.formatRaw(_taxAmount)}').padLeft(8)}');
+    }
+    buf.writeln(sep);
+    buf.writeln(
+        '${'TOTAL'.padRight(24)}${('$currency${CurrencyFormatter.formatRaw(_total)}').padLeft(8)}');
+    buf.writeln(sep);
+
+    if (payment != null) {
+      buf.writeln('Payment : ${payment.method.toUpperCase()}');
+      if (payment.method == AppConstants.paymentMethodCash) {
+        buf.writeln(
+            '${'Tendered'.padRight(24)}${('$currency${CurrencyFormatter.formatRaw(payment.amountTendered)}').padLeft(8)}');
+        buf.writeln(
+            '${'Change'.padRight(24)}${('$currency${CurrencyFormatter.formatRaw(payment.changeAmount)}').padLeft(8)}');
+      }
+    }
+
+    buf.writeln(sep);
+    if (footer.isNotEmpty) buf.writeln(footer);
+    buf.writeln('Thank you! Visit again.');
+    buf.writeln(sep);
+
+    await SharePlus.instance.share(ShareParams(
+      text: buf.toString(),
+      subject: 'Receipt — ${order.displayId} — $cafeName',
+    ));
   }
 
   Future<void> _printReceipt(OrderModel order) async {

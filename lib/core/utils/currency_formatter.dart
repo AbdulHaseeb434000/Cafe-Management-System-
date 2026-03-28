@@ -12,4 +12,8 @@ class CurrencyFormatter {
     final formatter = NumberFormat('#,##0');
     return '$symbol ${formatter.format(amount)}';
   }
+
+  /// Amount only, no symbol — used for share receipt text alignment
+  static String formatRaw(double amount) =>
+      NumberFormat('#,##0.00').format(amount);
 }
