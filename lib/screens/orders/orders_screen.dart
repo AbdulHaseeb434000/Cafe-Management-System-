@@ -135,10 +135,10 @@ class _OrderTile extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
           ),
-          const SizedBox(width: 8),
-          OrderTypeBadge(type: order.type, small: true),
           const SizedBox(width: 6),
-          OrderStatusBadge(status: order.status),
+          OrderTypeBadge(type: order.type, small: true),
+          const SizedBox(width: 4),
+          Flexible(child: OrderStatusBadge(status: order.status)),
         ],
       ),
       subtitle: Padding(
@@ -149,14 +149,22 @@ class _OrderTile extends StatelessWidget {
               .textTheme
               .bodySmall
               ?.copyWith(color: AppColors.textSecondary),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ),
-      trailing: Text(
-        CurrencyFormatter.format(order.total),
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: AppColors.primaryDark,
-              fontWeight: FontWeight.w700,
-            ),
+      trailing: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 90),
+        child: Text(
+          CurrencyFormatter.format(order.total),
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: AppColors.primaryDark,
+                fontWeight: FontWeight.w700,
+              ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.end,
+        ),
       ),
     );
   }

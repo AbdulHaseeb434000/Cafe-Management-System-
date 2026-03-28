@@ -130,18 +130,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
 
             const SectionHeader(title: 'Printers'),
-            _PrinterTile(
-              label: 'POS Printer (Receipts)',
-              addressKey: AppConstants.settingPosPrinterAddress,
-              nameKey: AppConstants.settingPosPrinterName,
-              settings: settings,
+            SwitchListTile.adaptive(
+              secondary: const Icon(Icons.print_outlined,
+                  size: 22, color: AppColors.textSecondary),
+              title: const Text('Use one printer for everything'),
+              subtitle: const Text(
+                  'Bills and kitchen tickets print on the same device'),
+              value: (settings[AppConstants.settingUseSinglePrinter] ?? 'false') == 'true',
+              activeColor: AppColors.primary,
+              onChanged: (v) {
+                ref.read(settingsNotifierProvider.notifier).set(
+                    AppConstants.settingUseSinglePrinter, v ? 'true' : 'false');
+                if (v) {
+                  // Mirror POS printer → kitchen printer
+                  ref.read(settingsNotifierProvider.notifier).setAll({
+                    AppConstants.settingKitchenPrinterAddress:
+                        settings[AppConstants.settingPosPrinterAddress] ?? '',
+                    AppConstants.settingKitchenPrinterName:
+                        settings[AppConstants.settingPosPrinterName] ?? '',
+                  });
+                }
+              },
             ),
-            _PrinterTile(
-              label: 'Kitchen Printer (Tickets)',
-              addressKey: AppConstants.settingKitchenPrinterAddress,
-              nameKey: AppConstants.settingKitchenPrinterName,
-              settings: settings,
-            ),
+            if ((settings[AppConstants.settingUseSinglePrinter] ?? 'false') == 'true')
+              _PrinterTile(
+                label: 'Printer (Bills & Kitchen Tickets)',
+                primaryAddressKey: AppConstants.settingPosPrinterAddress,
+                primaryNameKey: AppConstants.settingPosPrinterName,
+                mirrorAddressKey: AppConstants.settingKitchenPrinterAddress,
+                mirrorNameKey: AppConstants.settingKitchenPrinterName,
+                settings: settings,
+              )
+            else ...[
+              _PrinterTile(
+                label: 'POS Printer (Bills / Receipts)',
+                primaryAddressKey: AppConstants.settingPosPrinterAddress,
+                primaryNameKey: AppConstants.settingPosPrinterName,
+                settings: settings,
+              ),
+              _PrinterTile(
+                label: 'Kitchen Printer (Order Tickets)',
+                primaryAddressKey: AppConstants.settingKitchenPrinterAddress,
+                primaryNameKey: AppConstants.settingKitchenPrinterName,
+                settings: settings,
+              ),
+            ],
 
             const SectionHeader(title: 'Tables'),
             _TableManagementTile(),
@@ -224,28 +257,33 @@ class _SettingsTile extends StatelessWidget {
 
 class _PrinterTile extends ConsumerWidget {
   final String label;
-  final String addressKey;
-  final String nameKey;
+  final String primaryAddressKey;
+  final String primaryNameKey;
+  // When set, selecting a printer also saves to these keys (single-printer mode)
+  final String? mirrorAddressKey;
+  final String? mirrorNameKey;
   final Map<String, String> settings;
 
   const _PrinterTile({
     required this.label,
-    required this.addressKey,
-    required this.nameKey,
+    required this.primaryAddressKey,
+    required this.primaryNameKey,
+    this.mirrorAddressKey,
+    this.mirrorNameKey,
     required this.settings,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final name = settings[nameKey] ?? '';
-    final address = settings[addressKey] ?? '';
+    final name = settings[primaryNameKey] ?? '';
+    final address = settings[primaryAddressKey] ?? '';
 
     return ListTile(
-      leading:
-          const Icon(Icons.print_outlined, size: 22, color: AppColors.textSecondary),
+      leading: const Icon(Icons.print_outlined,
+          size: 22, color: AppColors.textSecondary),
       title: Text(label),
       subtitle: Text(
-        name.isEmpty ? 'Not configured' : '$name ($address)',
+        name.isEmpty ? 'Not configured — tap to pair' : '$name  •  $address',
         style: Theme.of(context)
             .textTheme
             .bodySmall
@@ -253,8 +291,11 @@ class _PrinterTile extends ConsumerWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: const Icon(Icons.chevron_right, size: 18,
-          color: AppColors.textSecondary),
+      trailing: Icon(
+        name.isEmpty ? Icons.warning_amber_outlined : Icons.check_circle_outline,
+        size: 18,
+        color: name.isEmpty ? AppColors.warning : AppColors.success,
+      ),
       onTap: () => _showPrinterPicker(context, ref, name, address),
     );
   }
@@ -266,56 +307,81 @@ class _PrinterTile extends ConsumerWidget {
     if (!context.mounted) return;
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (ctx) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(label,
-                style: Theme.of(ctx).textTheme.titleMedium),
-          ),
-          const Divider(height: 1),
-          if (devices.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('No paired Bluetooth devices found.\nPair your printer in Android Bluetooth settings first.'),
-            )
-          else
-            ...devices.map(
-              (d) => ListTile(
-                leading: const Icon(Icons.print_outlined),
-                title: Text(d.name),
-                subtitle: Text(d.macAdress),
-                selected: currentAddress == d.macAdress,
-                selectedTileColor: AppColors.primaryLight.withValues(alpha: 0.2),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.bluetooth_searching, color: AppColors.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(label,
+                        style: Theme.of(ctx).textTheme.titleMedium),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            if (devices.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'No paired Bluetooth devices found.\n\nPair your thermal printer in Android Settings → Bluetooth first, then come back here.',
+                  textAlign: TextAlign.center,
+                ),
+              )
+            else
+              ...devices.map(
+                (d) => ListTile(
+                  leading: const Icon(Icons.print_outlined),
+                  title: Text(d.name),
+                  subtitle: Text(d.macAdress),
+                  selected: currentAddress == d.macAdress,
+                  selectedTileColor:
+                      AppColors.primaryLight.withValues(alpha: 0.15),
+                  trailing: currentAddress == d.macAdress
+                      ? const Icon(Icons.check, color: AppColors.primary, size: 18)
+                      : null,
+                  onTap: () {
+                    final updates = {
+                      primaryNameKey: d.name,
+                      primaryAddressKey: d.macAdress,
+                    };
+                    if (mirrorAddressKey != null && mirrorNameKey != null) {
+                      updates[mirrorNameKey!] = d.name;
+                      updates[mirrorAddressKey!] = d.macAdress;
+                    }
+                    ref.read(settingsNotifierProvider.notifier).setAll(updates);
+                    Navigator.pop(ctx);
+                  },
+                ),
+              ),
+            if (currentAddress.isNotEmpty) ...[
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.link_off, color: AppColors.error),
+                title: const Text('Remove Printer',
+                    style: TextStyle(color: AppColors.error)),
                 onTap: () {
-                  ref
-                      .read(settingsNotifierProvider.notifier)
-                      .setAll({
-                    nameKey: d.name,
-                    addressKey: d.macAdress,
-                  });
+                  final updates = {primaryNameKey: '', primaryAddressKey: ''};
+                  if (mirrorAddressKey != null && mirrorNameKey != null) {
+                    updates[mirrorNameKey!] = '';
+                    updates[mirrorAddressKey!] = '';
+                  }
+                  ref.read(settingsNotifierProvider.notifier).setAll(updates);
                   Navigator.pop(ctx);
                 },
               ),
-            ),
-          if (currentAddress.isNotEmpty)
-            ListTile(
-              leading:
-                  const Icon(Icons.link_off, color: AppColors.error),
-              title: const Text('Remove Printer',
-                  style: TextStyle(color: AppColors.error)),
-              onTap: () {
-                ref
-                    .read(settingsNotifierProvider.notifier)
-                    .setAll({nameKey: '', addressKey: ''});
-                Navigator.pop(ctx);
-              },
-            ),
-          const SizedBox(height: 8),
-        ],
+            ],
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

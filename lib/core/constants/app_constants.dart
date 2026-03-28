@@ -17,6 +17,7 @@ class AppConstants {
   static const String settingPosPrinterName = 'pos_printer_name';
   static const String settingKitchenPrinterAddress = 'kitchen_printer_address';
   static const String settingKitchenPrinterName = 'kitchen_printer_name';
+  static const String settingUseSinglePrinter = 'use_single_printer';
   static const String settingCurrencySymbol = 'currency_symbol';
 
   // Default values

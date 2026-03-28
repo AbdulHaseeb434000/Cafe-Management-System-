@@ -270,7 +270,7 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(12),
@@ -279,21 +279,25 @@ class _SummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 20, color: color),
-            const SizedBox(height: 8),
-            Text(value,
-                style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    color: color),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
+            Icon(icon, size: 18, color: color),
+            const SizedBox(height: 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: color)),
+            ),
             const SizedBox(height: 2),
             Text(label,
                 style: Theme.of(context)
                     .textTheme
                     .labelSmall
-                    ?.copyWith(color: AppColors.textSecondary)),
+                    ?.copyWith(color: AppColors.textSecondary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
           ],
         ),
       );
@@ -493,7 +497,7 @@ class _TypePieChart extends StatelessWidget {
                 final rev =
                     (e['revenue'] as num?)?.toDouble() ?? 0;
                 return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 5),
                   child: Row(
                     children: [
                       Container(
@@ -505,12 +509,16 @@ class _TypePieChart extends StatelessWidget {
                       const SizedBox(width: 6),
                       Expanded(
                           child: Text(_labelForType(type),
-                              style:
-                                  const TextStyle(fontSize: 12))),
-                      Text(CurrencyFormatter.formatCompact(rev),
-                          style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
+                              style: const TextStyle(fontSize: 12),
+                              overflow: TextOverflow.ellipsis)),
+                      const SizedBox(width: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(CurrencyFormatter.format(rev),
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                      ),
                     ],
                   ),
                 );
