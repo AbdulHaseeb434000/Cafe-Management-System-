@@ -12,14 +12,14 @@ class PdfReceiptService {
   PdfReceiptService._();
   static final PdfReceiptService instance = PdfReceiptService._();
 
-  // 80 mm wide receipt with small margins
+  // 80 mm wide, height grows with content (thermal roll paper)
   static final _fmt = PdfPageFormat(
     80 * PdfPageFormat.mm,
-    300 * PdfPageFormat.mm,
-    marginLeft: 5 * PdfPageFormat.mm,
-    marginRight: 5 * PdfPageFormat.mm,
-    marginTop: 5 * PdfPageFormat.mm,
-    marginBottom: 5 * PdfPageFormat.mm,
+    double.infinity,
+    marginLeft: 4 * PdfPageFormat.mm,
+    marginRight: 4 * PdfPageFormat.mm,
+    marginTop: 4 * PdfPageFormat.mm,
+    marginBottom: 4 * PdfPageFormat.mm,
   );
 
   // ── Public API ───────────────────────────────────────────────────────────
