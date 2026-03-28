@@ -136,27 +136,78 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Daily trend
-                  if (_daily.isNotEmpty) ...[
-                    _sectionTitle('Daily Revenue'),
-                    const SizedBox(height: 8),
-                    _DailyChart(data: _daily),
-                    const SizedBox(height: 20),
-                  ],
+                  // Daily trend + pie chart (side by side on tablet)
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isTablet = constraints.maxWidth >= 600;
+                      final hasDailyData = _daily.isNotEmpty;
+                      final hasByTypeData = _byType.isNotEmpty;
+
+                      if (isTablet && hasDailyData && hasByTypeData) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _sectionTitle('Daily Revenue'),
+                                      const SizedBox(height: 8),
+                                      _DailyChart(data: _daily, isTablet: true),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      _sectionTitle('Revenue by Order Type'),
+                                      const SizedBox(height: 8),
+                                      _TypePieChart(data: _byType, isTablet: true),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                        );
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (hasDailyData) ...[
+                            _sectionTitle('Daily Revenue'),
+                            const SizedBox(height: 8),
+                            _DailyChart(data: _daily, isTablet: false),
+                            const SizedBox(height: 20),
+                          ],
+                          if (hasByTypeData) ...[
+                            _sectionTitle('Revenue by Order Type'),
+                            const SizedBox(height: 8),
+                            _TypePieChart(data: _byType, isTablet: false),
+                            const SizedBox(height: 20),
+                          ],
+                        ],
+                      );
+                    },
+                  ),
 
                   // Top items
                   if (_topItems.isNotEmpty) ...[
                     _sectionTitle('Top Selling Items'),
                     const SizedBox(height: 8),
-                    _TopItemsChart(items: _topItems),
-                    const SizedBox(height: 20),
-                  ],
-
-                  // By order type
-                  if (_byType.isNotEmpty) ...[
-                    _sectionTitle('Revenue by Order Type'),
-                    const SizedBox(height: 8),
-                    _TypePieChart(data: _byType),
+                    LayoutBuilder(
+                      builder: (context, constraints) => _TopItemsChart(
+                        items: _topItems,
+                        isTablet: constraints.maxWidth >= 600,
+                      ),
+                    ),
                     const SizedBox(height: 20),
                   ],
 
@@ -305,7 +356,8 @@ class _SummaryCard extends StatelessWidget {
 
 class _DailyChart extends StatelessWidget {
   final List<Map<String, dynamic>> data;
-  const _DailyChart({required this.data});
+  final bool isTablet;
+  const _DailyChart({required this.data, this.isTablet = false});
 
   @override
   Widget build(BuildContext context) {
@@ -315,7 +367,7 @@ class _DailyChart extends StatelessWidget {
     }).toList();
 
     return Container(
-      height: 180,
+      height: isTablet ? 220 : 160,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -373,7 +425,8 @@ class _DailyChart extends StatelessWidget {
 
 class _TopItemsChart extends StatelessWidget {
   final List<Map<String, dynamic>> items;
-  const _TopItemsChart({required this.items});
+  final bool isTablet;
+  const _TopItemsChart({required this.items, this.isTablet = false});
 
   @override
   Widget build(BuildContext context) {
@@ -401,7 +454,7 @@ class _TopItemsChart extends StatelessWidget {
             child: Row(
               children: [
                 SizedBox(
-                  width: 100,
+                  width: isTablet ? 140 : 90,
                   child: Text(name,
                       style: const TextStyle(fontSize: 11),
                       overflow: TextOverflow.ellipsis,
@@ -434,7 +487,8 @@ class _TopItemsChart extends StatelessWidget {
 
 class _TypePieChart extends StatelessWidget {
   final List<Map<String, dynamic>> data;
-  const _TypePieChart({required this.data});
+  final bool isTablet;
+  const _TypePieChart({required this.data, this.isTablet = false});
 
   Color _colorForType(String type) => switch (type) {
         AppConstants.orderTypeDineIn => AppColors.dineIn,
@@ -463,12 +517,12 @@ class _TypePieChart extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: 120,
-            height: 120,
+            width: isTablet ? 160 : 110,
+            height: isTablet ? 160 : 110,
             child: PieChart(
               PieChartData(
                 sectionsSpace: 2,
-                centerSpaceRadius: 30,
+                centerSpaceRadius: isTablet ? 40 : 28,
                 sections: data.map((e) {
                   final type = e['type'] as String? ?? '';
                   final rev =
@@ -478,7 +532,7 @@ class _TypePieChart extends StatelessWidget {
                     color: _colorForType(type),
                     value: rev,
                     title: '${pct.toStringAsFixed(0)}%',
-                    radius: 30,
+                    radius: isTablet ? 40 : 28,
                     titleStyle: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,

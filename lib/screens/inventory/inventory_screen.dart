@@ -78,22 +78,50 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 return RefreshIndicator(
                   onRefresh: () async =>
                       ref.read(inventoryProvider.notifier).load(),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: filtered.length,
-                    separatorBuilder: (_, __) =>
-                        const Divider(height: 1, indent: 16),
-                    itemBuilder: (_, i) => _InventoryTile(
-                      item: filtered[i],
-                      onAdjust: () =>
-                          _showAdjustDialog(context, filtered[i]),
-                      onEdit: () =>
-                          _showItemDialog(context, existing: filtered[i]),
-                      onDelete: () =>
-                          _deleteItem(context, filtered[i]),
-                      onViewLog: () =>
-                          _showLog(context, filtered[i]),
-                    ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth >= 600) {
+                        return GridView.builder(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 0,
+                            mainAxisSpacing: 0,
+                            childAspectRatio: 2.5,
+                          ),
+                          itemCount: filtered.length,
+                          itemBuilder: (_, i) => _InventoryTile(
+                            item: filtered[i],
+                            onAdjust: () =>
+                                _showAdjustDialog(context, filtered[i]),
+                            onEdit: () => _showItemDialog(context,
+                                existing: filtered[i]),
+                            onDelete: () =>
+                                _deleteItem(context, filtered[i]),
+                            onViewLog: () =>
+                                _showLog(context, filtered[i]),
+                          ),
+                        );
+                      }
+                      return ListView.separated(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1, indent: 16),
+                        itemBuilder: (_, i) => _InventoryTile(
+                          item: filtered[i],
+                          onAdjust: () =>
+                              _showAdjustDialog(context, filtered[i]),
+                          onEdit: () =>
+                              _showItemDialog(context, existing: filtered[i]),
+                          onDelete: () =>
+                              _deleteItem(context, filtered[i]),
+                          onViewLog: () =>
+                              _showLog(context, filtered[i]),
+                        ),
+                      );
+                    },
                   ),
                 );
               },

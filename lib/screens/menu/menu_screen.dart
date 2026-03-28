@@ -125,13 +125,33 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                         subtitle: 'Tap + to add a menu item',
                       );
                     }
-                    return ListView.separated(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) =>
-                          const Divider(height: 1, indent: 16),
-                      itemBuilder: (_, i) =>
-                          _ItemTile(item: items[i]),
+                    return LayoutBuilder(
+                      builder: (context, constraints) {
+                        if (constraints.maxWidth >= 600) {
+                          return GridView.builder(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 8, horizontal: 8),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 0,
+                              mainAxisSpacing: 0,
+                              childAspectRatio: 4,
+                            ),
+                            itemCount: items.length,
+                            itemBuilder: (_, i) =>
+                                _ItemTile(item: items[i]),
+                          );
+                        }
+                        return ListView.separated(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: items.length,
+                          separatorBuilder: (_, __) =>
+                              const Divider(height: 1, indent: 16),
+                          itemBuilder: (_, i) =>
+                              _ItemTile(item: items[i]),
+                        );
+                      },
                     );
                   },
                 ),

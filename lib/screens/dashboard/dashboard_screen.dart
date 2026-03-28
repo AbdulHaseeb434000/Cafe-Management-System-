@@ -88,11 +88,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ref.read(tablesProvider.notifier).load();
           ref.invalidate(lowStockProvider);
         },
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Low stock alert
-            lowStockAsync.when(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isTablet = constraints.maxWidth >= 600;
+
+            // Shared alert banner widget
+            final alertBanner = lowStockAsync.when(
               data: (items) => items.isEmpty
                   ? const SizedBox()
                   : _AlertBanner(
@@ -104,86 +105,94 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
               loading: () => const SizedBox(),
               error: (_, __) => const SizedBox(),
-            ),
+            );
 
-            const SizedBox(height: 4),
-
-            // Today stats
-            Text("Today's Summary",
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 10),
-            _loadingStats
-                ? const Center(child: CircularProgressIndicator())
-                : Row(
-                    children: [
-                      Expanded(
-                          child: _StatCard(
-                              label: 'Revenue',
-                              value: CurrencyFormatter.format(revenue),
-                              icon: Icons.payments_outlined,
-                              color: AppColors.primary)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child: _StatCard(
-                              label: 'Orders',
-                              value: '$orderCount',
-                              icon: Icons.receipt_long_outlined,
-                              color: AppColors.brown)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child: _StatCard(
-                              label: 'Avg',
-                              value: CurrencyFormatter.formatCompact(avgOrder),
-                              icon: Icons.analytics_outlined,
-                              color: AppColors.delivery)),
-                    ],
-                  ),
-            const SizedBox(height: 20),
-
-            // Quick actions
-            Text('Quick Actions',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 10),
-            Row(
+            // Stats row widget
+            final statsSection = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _QuickAction(
-                    icon: Icons.add_shopping_cart_outlined,
-                    label: 'New Order',
-                    color: AppColors.primary,
-                    onTap: () => context.push('/orders/new'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickAction(
-                    icon: Icons.soup_kitchen_outlined,
-                    label: 'Kitchen',
-                    color: AppColors.brown,
-                    onTap: () => context.go('/kitchen'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _QuickAction(
-                    icon: Icons.bar_chart_outlined,
-                    label: 'Reports',
-                    color: AppColors.delivery,
-                    onTap: () => context.go('/reports'),
-                  ),
-                ),
+                Text("Today's Summary",
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+                _loadingStats
+                    ? const Center(child: CircularProgressIndicator())
+                    : Row(
+                        children: [
+                          Expanded(
+                              child: _StatCard(
+                                  label: 'Revenue',
+                                  value: CurrencyFormatter.format(revenue),
+                                  icon: Icons.payments_outlined,
+                                  color: AppColors.primary)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                              child: _StatCard(
+                                  label: 'Orders',
+                                  value: '$orderCount',
+                                  icon: Icons.receipt_long_outlined,
+                                  color: AppColors.brown)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                              child: _StatCard(
+                                  label: 'Avg',
+                                  value: CurrencyFormatter.formatCompact(avgOrder),
+                                  icon: Icons.analytics_outlined,
+                                  color: AppColors.delivery)),
+                        ],
+                      ),
+                const SizedBox(height: 20),
               ],
-            ),
-            const SizedBox(height: 20),
+            );
 
-            // Active orders
-            activeAsync.when(
+            // Quick actions widget
+            final quickActionsSection = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Quick Actions',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _QuickAction(
+                        icon: Icons.add_shopping_cart_outlined,
+                        label: 'New Order',
+                        color: AppColors.primary,
+                        onTap: () => context.push('/orders/new'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _QuickAction(
+                        icon: Icons.soup_kitchen_outlined,
+                        label: 'Kitchen',
+                        color: AppColors.brown,
+                        onTap: () => context.go('/kitchen'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _QuickAction(
+                        icon: Icons.bar_chart_outlined,
+                        label: 'Reports',
+                        color: AppColors.delivery,
+                        onTap: () => context.go('/reports'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+              ],
+            );
+
+            // Active orders widget
+            final activeOrdersSection = activeAsync.when(
               loading: () => const SizedBox(),
               error: (_, __) => const SizedBox(),
               data: (orders) {
@@ -213,10 +222,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ],
                 );
               },
-            ),
+            );
 
-            // Tables overview
-            tablesAsync.when(
+            // Tables section widget
+            final tablesSection = tablesAsync.when(
               loading: () => const SizedBox(),
               error: (_, __) => const SizedBox(),
               data: (tables) {
@@ -253,12 +262,53 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    _MiniTableGrid(tables: tables),
+                    _MiniTableGrid(tables: tables, isTablet: isTablet),
                   ],
                 );
               },
-            ),
-          ],
+            );
+
+            if (isTablet) {
+              return ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  alertBanner,
+                  const SizedBox(height: 4),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            statsSection,
+                            quickActionsSection,
+                            activeOrdersSection,
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: tablesSection,
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            }
+
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                alertBanner,
+                const SizedBox(height: 4),
+                statsSection,
+                quickActionsSection,
+                activeOrdersSection,
+                tablesSection,
+              ],
+            );
+          },
         ),
       ),
     );
@@ -333,13 +383,15 @@ class _StatCard extends StatelessWidget {
           children: [
             Icon(icon, size: 18, color: color),
             const SizedBox(height: 8),
-            Text(value,
-                style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    color: color),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: color)),
+            ),
             Text(label,
                 style: Theme.of(context)
                     .textTheme
@@ -381,7 +433,7 @@ class _QuickAction extends StatelessWidget {
               Text(label,
                   style: TextStyle(
                       color: color,
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600)),
             ],
           ),
@@ -458,10 +510,12 @@ class _TableStat extends StatelessWidget {
 
 class _MiniTableGrid extends StatelessWidget {
   final List<TableModel> tables;
-  const _MiniTableGrid({required this.tables});
+  final bool isTablet;
+  const _MiniTableGrid({required this.tables, this.isTablet = false});
 
   @override
   Widget build(BuildContext context) {
+    final cellSize = isTablet ? 56.0 : 44.0;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -474,8 +528,8 @@ class _MiniTableGrid extends StatelessWidget {
         return GestureDetector(
           onTap: () => context.go('/tables'),
           child: Container(
-            width: 52,
-            height: 52,
+            width: cellSize,
+            height: cellSize,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),

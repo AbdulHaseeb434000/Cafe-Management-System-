@@ -116,245 +116,292 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text('Bill — ${order.displayId}')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Items summary
-            _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Order Items',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  ...order.items.map((item) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3),
-                        child: Row(
-                          children: [
-                            Text('${item.quantity}×',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13)),
-                            const SizedBox(width: 8),
-                            Expanded(
-                                child: Text(item.nameSnapshot,
-                                    style: const TextStyle(fontSize: 13))),
-                            Text(
-                              CurrencyFormatter.format(item.lineTotal),
-                              style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500),
-                            ),
-                          ],
-                        ),
-                      )),
-                  const Divider(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Subtotal',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
-                      Text(CurrencyFormatter.format(_subtotal),
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTablet = constraints.maxWidth >= 600;
 
-            // Discount
-            _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Discount',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ToggleButton(
-                          label: 'Flat (Rs.)',
-                          selected: _discountType ==
-                              AppConstants.discountTypeFlat,
-                          onTap: () => setState(() {
-                            _discountType =
-                                AppConstants.discountTypeFlat;
-                            _discountCtrl.text = '0';
-                          }),
-                        ),
+          // Left column content: order items + discount
+          final orderItemsCard = _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Order Items',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                ...order.items.map((item) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(
+                        children: [
+                          Text('${item.quantity}×',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                              child: Text(item.nameSnapshot,
+                                  style: const TextStyle(fontSize: 13))),
+                          Text(
+                            CurrencyFormatter.format(item.lineTotal),
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _ToggleButton(
-                          label: 'Percent (%)',
-                          selected: _discountType ==
-                              AppConstants.discountTypePercent,
-                          onTap: () => setState(() {
-                            _discountType =
-                                AppConstants.discountTypePercent;
-                            _discountCtrl.text = '0';
-                          }),
-                        ),
+                    )),
+                const Divider(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Subtotal',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text(CurrencyFormatter.format(_subtotal),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ],
+            ),
+          );
+
+          final discountCard = _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Discount',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ToggleButton(
+                        label: 'Flat (Rs.)',
+                        selected: _discountType ==
+                            AppConstants.discountTypeFlat,
+                        onTap: () => setState(() {
+                          _discountType =
+                              AppConstants.discountTypeFlat;
+                          _discountCtrl.text = '0';
+                        }),
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _ToggleButton(
+                        label: 'Percent (%)',
+                        selected: _discountType ==
+                            AppConstants.discountTypePercent,
+                        onTap: () => setState(() {
+                          _discountType =
+                              AppConstants.discountTypePercent;
+                          _discountCtrl.text = '0';
+                        }),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _discountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true),
+                  decoration: InputDecoration(
+                    labelText: _discountType ==
+                            AppConstants.discountTypeFlat
+                        ? 'Discount Amount'
+                        : 'Discount %',
+                    suffixText: _discountType ==
+                            AppConstants.discountTypePercent
+                        ? '%'
+                        : null,
                   ),
+                ),
+              ],
+            ),
+          );
+
+          // Right column content: totals + payment + button
+          final totalsCard = _card(
+            child: Column(
+              children: [
+                _totalRow('Subtotal', CurrencyFormatter.format(_subtotal)),
+                if (_discountAmount > 0)
+                  _totalRow('Discount',
+                      '- ${CurrencyFormatter.format(_discountAmount)}',
+                      color: AppColors.success),
+                if (_taxAmount > 0)
+                  _totalRow(
+                      'Tax (${_taxPercent.toStringAsFixed(1)}%)',
+                      CurrencyFormatter.format(_taxAmount)),
+                const Divider(height: 16),
+                _totalRow('TOTAL', CurrencyFormatter.format(_total),
+                    bold: true),
+              ],
+            ),
+          );
+
+          final paymentCard = _card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Payment Method',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ToggleButton(
+                        label: 'Cash',
+                        icon: Icons.payments_outlined,
+                        selected: _paymentMethod ==
+                            AppConstants.paymentMethodCash,
+                        onTap: () => setState(() => _paymentMethod =
+                            AppConstants.paymentMethodCash),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _ToggleButton(
+                        label: 'Card',
+                        icon: Icons.credit_card_outlined,
+                        selected: _paymentMethod ==
+                            AppConstants.paymentMethodCard,
+                        onTap: () => setState(() => _paymentMethod =
+                            AppConstants.paymentMethodCard),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_paymentMethod == AppConstants.paymentMethodCash) ...[
                   const SizedBox(height: 12),
                   TextField(
-                    controller: _discountCtrl,
+                    controller: _tenderedCtrl,
                     keyboardType: const TextInputType.numberWithOptions(
                         decimal: true),
-                    decoration: InputDecoration(
-                      labelText: _discountType ==
-                              AppConstants.discountTypeFlat
-                          ? 'Discount Amount'
-                          : 'Discount %',
-                      suffixText: _discountType ==
-                              AppConstants.discountTypePercent
-                          ? '%'
-                          : null,
-                    ),
+                    decoration: const InputDecoration(
+                        labelText: 'Amount Tendered',
+                        prefixText: 'Rs. '),
+                    onChanged: (_) => setState(() {}),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Totals
-            _card(
-              child: Column(
-                children: [
-                  _totalRow('Subtotal', CurrencyFormatter.format(_subtotal)),
-                  if (_discountAmount > 0)
-                    _totalRow('Discount',
-                        '- ${CurrencyFormatter.format(_discountAmount)}',
-                        color: AppColors.success),
-                  if (_taxAmount > 0)
-                    _totalRow(
-                        'Tax (${_taxPercent.toStringAsFixed(1)}%)',
-                        CurrencyFormatter.format(_taxAmount)),
-                  const Divider(height: 16),
-                  _totalRow('TOTAL', CurrencyFormatter.format(_total),
-                      bold: true),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Payment method
-            _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Payment Method',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ToggleButton(
-                          label: 'Cash',
-                          icon: Icons.payments_outlined,
-                          selected: _paymentMethod ==
-                              AppConstants.paymentMethodCash,
-                          onTap: () => setState(() => _paymentMethod =
-                              AppConstants.paymentMethodCash),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _ToggleButton(
-                          label: 'Card',
-                          icon: Icons.credit_card_outlined,
-                          selected: _paymentMethod ==
-                              AppConstants.paymentMethodCard,
-                          onTap: () => setState(() => _paymentMethod =
-                              AppConstants.paymentMethodCard),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_paymentMethod == AppConstants.paymentMethodCash) ...[
+                  if (_tenderedCtrl.text.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: _tenderedCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
-                      decoration: const InputDecoration(
-                          labelText: 'Amount Tendered',
-                          prefixText: 'Rs. '),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    if (_tenderedCtrl.text.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color:
-                                  AppColors.success.withValues(alpha: 0.3)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Change',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.success)),
-                            Text(
-                              CurrencyFormatter.format(_change),
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 18,
-                                  color: AppColors.success),
-                            ),
-                          ],
-                        ),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color:
+                                AppColors.success.withValues(alpha: 0.3)),
                       ),
-                    ],
+                      child: Row(
+                        mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Change',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.success)),
+                          Text(
+                            CurrencyFormatter.format(_change),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 18,
+                                color: AppColors.success),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ],
-              ),
+              ],
             ),
-            const SizedBox(height: 24),
+          );
 
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _processing ? null : _completePayment,
-                icon: _processing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.check_circle_outline),
-                label: Text(_processing
-                    ? 'Processing...'
-                    : 'Complete Payment'),
-                style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16)),
-              ),
+          final completeButton = SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _processing ? null : _completePayment,
+              icon: _processing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.check_circle_outline),
+              label: Text(_processing
+                  ? 'Processing...'
+                  : 'Complete Payment'),
+              style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16)),
             ),
-            const SizedBox(height: 8),
-          ],
-        ),
+          );
+
+          if (isTablet) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 6,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        orderItemsCard,
+                        const SizedBox(height: 12),
+                        discountCard,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 4,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        totalsCard,
+                        const SizedBox(height: 12),
+                        paymentCard,
+                        const SizedBox(height: 24),
+                        completeButton,
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                orderItemsCard,
+                const SizedBox(height: 12),
+                discountCard,
+                const SizedBox(height: 12),
+                totalsCard,
+                const SizedBox(height: 12),
+                paymentCard,
+                const SizedBox(height: 24),
+                completeButton,
+                const SizedBox(height: 8),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

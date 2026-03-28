@@ -160,45 +160,68 @@ class _TypeSelectionStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Select Order Type',
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text('How will the customer be served?',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppColors.textSecondary)),
-          const SizedBox(height: 32),
-          _TypeCard(
-            icon: Icons.table_restaurant,
-            label: 'Dine-In',
-            subtitle: 'Customer sits at a table',
-            color: AppColors.dineIn,
-            onTap: () => onSelected(AppConstants.orderTypeDineIn),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTablet = constraints.maxWidth >= 600;
+        final padding = isTablet ? 24.0 : 16.0;
+
+        final dineInCard = _TypeCard(
+          icon: Icons.table_restaurant,
+          label: 'Dine-In',
+          subtitle: 'Customer sits at a table',
+          color: AppColors.dineIn,
+          onTap: () => onSelected(AppConstants.orderTypeDineIn),
+        );
+        final takeawayCard = _TypeCard(
+          icon: Icons.shopping_bag_outlined,
+          label: 'Takeaway',
+          subtitle: 'Customer picks up at counter',
+          color: AppColors.takeaway,
+          onTap: () => onSelected(AppConstants.orderTypeTakeaway),
+        );
+        final deliveryCard = _TypeCard(
+          icon: Icons.delivery_dining,
+          label: 'Delivery',
+          subtitle: 'Deliver to customer\'s address',
+          color: AppColors.delivery,
+          onTap: () => onSelected(AppConstants.orderTypeDelivery),
+        );
+
+        return Padding(
+          padding: EdgeInsets.all(padding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Select Order Type',
+                  style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 8),
+              Text('How will the customer be served?',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: AppColors.textSecondary)),
+              const SizedBox(height: 32),
+              if (isTablet)
+                Row(
+                  children: [
+                    Expanded(child: dineInCard),
+                    const SizedBox(width: 16),
+                    Expanded(child: takeawayCard),
+                    const SizedBox(width: 16),
+                    Expanded(child: deliveryCard),
+                  ],
+                )
+              else ...[
+                dineInCard,
+                const SizedBox(height: 16),
+                takeawayCard,
+                const SizedBox(height: 16),
+                deliveryCard,
+              ],
+            ],
           ),
-          const SizedBox(height: 16),
-          _TypeCard(
-            icon: Icons.shopping_bag_outlined,
-            label: 'Takeaway',
-            subtitle: 'Customer picks up at counter',
-            color: AppColors.takeaway,
-            onTap: () => onSelected(AppConstants.orderTypeTakeaway),
-          ),
-          const SizedBox(height: 16),
-          _TypeCard(
-            icon: Icons.delivery_dining,
-            label: 'Delivery',
-            subtitle: 'Deliver to customer\'s address',
-            color: AppColors.delivery,
-            onTap: () => onSelected(AppConstants.orderTypeDelivery),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -300,51 +323,55 @@ class _TableSelectionStep extends ConsumerWidget {
                   style: Theme.of(context).textTheme.headlineSmall),
             ),
             Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.2,
-                ),
-                itemCount: freeTables.length,
-                itemBuilder: (_, i) {
-                  final t = freeTables[i];
-                  return InkWell(
-                    onTap: () {
-                      ref
-                          .read(cartProvider.notifier)
-                          .setTable(t.id!, t.uuid, t.name);
-                      onSelected();
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.table_restaurant,
-                              size: 32, color: AppColors.primary),
-                          const SizedBox(height: 8),
-                          Text(t.name,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.w700)),
-                          Text('${t.capacity} seats',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(color: AppColors.textSecondary)),
-                        ],
-                      ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final crossAxisCount = constraints.maxWidth >= 600 ? 4 : 2;
+                  return GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1.2,
                     ),
+                    itemCount: freeTables.length,
+                    itemBuilder: (_, i) {
+                      final t = freeTables[i];
+                      return InkWell(
+                        onTap: () {
+                          ref
+                              .read(cartProvider.notifier)
+                              .setTable(t.id!, t.uuid, t.name);
+                          onSelected();
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.table_restaurant,
+                                  size: 32, color: AppColors.primary),
+                              const SizedBox(height: 8),
+                              Text(t.name,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w700)),
+                              Text('${t.capacity} seats',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(color: AppColors.textSecondary)),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
@@ -578,18 +605,22 @@ class _MenuStepState extends ConsumerState<_MenuStep> {
               if (items.isEmpty) {
                 return const Center(child: Text('No items found'));
               }
-              return GridView.builder(
-                padding: const EdgeInsets.all(12),
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: 1.35,
-                ),
-                itemCount: items.length,
-                itemBuilder: (_, i) =>
-                    _MenuItemCard(item: items[i], cart: cart),
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final crossAxisCount = constraints.maxWidth >= 600 ? 4 : 2;
+                  return GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 1.35,
+                    ),
+                    itemCount: items.length,
+                    itemBuilder: (_, i) =>
+                        _MenuItemCard(item: items[i], cart: cart),
+                  );
+                },
               );
             },
           ),
