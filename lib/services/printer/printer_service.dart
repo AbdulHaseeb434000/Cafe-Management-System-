@@ -188,6 +188,12 @@ class PrinterService {
             styles: const PosStyles(align: PosAlign.center)));
       }
 
+      bytes.addAll(generator.emptyLines(1));
+      bytes.addAll(generator.hr());
+      bytes.addAll(generator.text('Developed by: Agentic-Devs',
+          styles: const PosStyles(align: PosAlign.center)));
+      bytes.addAll(generator.text('WhatsApp: +92 313 1248353',
+          styles: const PosStyles(align: PosAlign.center)));
       bytes.addAll(generator.emptyLines(3));
       bytes.addAll(generator.cut());
 

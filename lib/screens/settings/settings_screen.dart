@@ -182,6 +182,70 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SectionHeader(title: 'Backup & Restore'),
             _BackupRestoreSection(),
 
+            const SectionHeader(title: 'About'),
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.local_cafe,
+                            color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('CafeDesk',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700)),
+                          Text('Version ${AppConstants.appVersion}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  const Text('Developed by',
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary)),
+                  const SizedBox(height: 2),
+                  const Text('Agentic-Devs',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 15)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.chat_outlined,
+                          size: 16, color: AppColors.textSecondary),
+                      const SizedBox(width: 6),
+                      const Text('WhatsApp: +92 313 1248353',
+                          style: TextStyle(fontSize: 13)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
             const SizedBox(height: 32),
           ],
         ),

@@ -540,6 +540,9 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
     if (footer.isNotEmpty) buf.writeln(footer);
     buf.writeln('Thank you! Visit again.');
     buf.writeln(sep);
+    buf.writeln('Developed by : Agentic-Devs');
+    buf.writeln('WhatsApp     : +92 313 1248353');
+    buf.writeln(sep);
 
     await SharePlus.instance.share(ShareParams(
       text: buf.toString(),
