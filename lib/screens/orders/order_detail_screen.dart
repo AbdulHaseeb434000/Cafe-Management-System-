@@ -10,7 +10,8 @@ import '../../providers/order_providers.dart';
 import '../../providers/settings_providers.dart';
 import '../../providers/table_providers.dart';
 import '../../providers/repository_providers.dart';
-import '../../services/printer/printer_service.dart';
+import '../../services/pdf/pdf_receipt_service.dart';
+import '../../screens/receipt/receipt_preview_screen.dart';
 import '../../widgets/order_type_badge.dart';
 import '../../widgets/confirm_dialog.dart';
 
@@ -218,38 +219,32 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
   Future<void> _reprintReceipt(OrderModel order) async {
     final settings = ref.read(settingsNotifierProvider).valueOrNull ?? {};
-    final addr = settings[AppConstants.settingPosPrinterAddress] ?? '';
-    if (addr.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('POS printer not configured in Settings')),
-        );
-      }
-      return;
-    }
     final payment =
         await ref.read(paymentRepositoryProvider).getByOrderId(order.id!);
     if (payment == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No payment record found for this order')),
+          const SnackBar(
+              content: Text('No payment record found for this order')),
         );
       }
       return;
     }
-    await PrinterService.instance.printReceipt(
+    if (!mounted) return;
+    final pdfBytes = await PdfReceiptService.instance.buildReceipt(
       order: order,
       payment: payment,
-      cafeName: settings[AppConstants.settingCafeName] ?? 'My Cafe',
-      cafeAddress: settings[AppConstants.settingCafeAddress] ?? '',
-      cafePhone: settings[AppConstants.settingCafePhone] ?? '',
-      header: settings[AppConstants.settingReceiptHeader] ?? '',
-      footer: settings[AppConstants.settingReceiptFooter] ?? '',
-      currencySymbol: settings[AppConstants.settingCurrencySymbol] ??
-          AppConstants.defaultCurrencySymbol,
-      printerAddress: addr,
-      logoPath: settings[AppConstants.settingLogoPath] ?? '',
+      settings: Map<String, String>.from(settings),
+    );
+    if (!mounted) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReceiptPreviewScreen(
+          pdfBytes: pdfBytes,
+          filename: 'receipt_${order.displayId.replaceAll('#', '')}.pdf',
+        ),
+      ),
     );
   }
 
@@ -270,22 +265,19 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         ref.read(activeOrdersProvider.notifier).load();
         break;
       case 'print_kitchen':
-        final settings =
-            ref.read(settingsNotifierProvider).valueOrNull ?? {};
-        final addr =
-            settings[AppConstants.settingKitchenPrinterAddress] ?? '';
-        if (addr.isEmpty) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                  content: Text(
-                      'Kitchen printer not configured in Settings')),
-            );
-          }
-          return;
-        }
-        await PrinterService.instance
-            .printKitchenTicket(order: order, printerAddress: addr);
+        final pdfBytes =
+            await PdfReceiptService.instance.buildKitchenTicket(order);
+        if (!mounted) return;
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReceiptPreviewScreen(
+              pdfBytes: pdfBytes,
+              filename:
+                  'kitchen_${order.displayId.replaceAll('#', '')}.pdf',
+            ),
+          ),
+        );
         break;
       case 'cancel':
         final ok = await showConfirmDialog(

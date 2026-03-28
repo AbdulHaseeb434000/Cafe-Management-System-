@@ -25,10 +25,6 @@ dependencies:
   pdf: ^3.10.8
   printing: ^5.12.0
 
-  # Thermal printer
-  esc_pos_utils_plus: ^2.0.4
-  print_bluetooth_thermal: ^1.0.9
-
   # Responsive UI
   flutter_screenutil: ^5.9.3
 
@@ -47,7 +43,6 @@ dependencies:
   permission_handler: ^11.3.1
   share_plus: ^12.0.1
   file_picker: ^8.1.2
-  image: ^4.1.0
 
 dev_dependencies:
   flutter_test:

@@ -57,10 +57,6 @@ class DatabaseHelper {
       AppConstants.settingReceiptHeader: 'Thank you for visiting!',
       AppConstants.settingReceiptFooter: 'Please come again.',
       AppConstants.settingCurrencySymbol: AppConstants.defaultCurrencySymbol,
-      AppConstants.settingPosPrinterAddress: '',
-      AppConstants.settingPosPrinterName: '',
-      AppConstants.settingKitchenPrinterAddress: '',
-      AppConstants.settingKitchenPrinterName: '',
     };
     for (final entry in defaults.entries) {
       await db.insert('settings', {'key': entry.key, 'value': entry.value},

@@ -6,8 +6,8 @@ import '../../core/theme/app_colors.dart';
 import '../../models/order_model.dart';
 import '../../providers/order_providers.dart';
 import '../../providers/repository_providers.dart';
-import '../../providers/settings_providers.dart';
-import '../../services/printer/printer_service.dart';
+import '../../services/pdf/pdf_receipt_service.dart';
+import '../../screens/receipt/receipt_preview_screen.dart';
 import '../../widgets/order_type_badge.dart';
 import '../../widgets/empty_state.dart';
 
@@ -332,25 +332,19 @@ class _KitchenCard extends ConsumerWidget {
   }
 
   Future<void> _printTicket(BuildContext context, WidgetRef ref) async {
-    final settings =
-        ref.read(settingsNotifierProvider).valueOrNull ?? {};
-    final addr =
-        settings[AppConstants.settingKitchenPrinterAddress] ?? '';
-    if (addr.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content:
-                Text('Kitchen printer not configured in Settings')),
-      );
-      return;
-    }
-    final ok = await PrinterService.instance
-        .printKitchenTicket(order: order, printerAddress: addr);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content:
-              Text(ok ? 'Ticket printed' : 'Print failed')));
-    }
+    final pdfBytes =
+        await PdfReceiptService.instance.buildKitchenTicket(order);
+    if (!context.mounted) return;
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReceiptPreviewScreen(
+          pdfBytes: pdfBytes,
+          filename:
+              'kitchen_${order.displayId.replaceAll('#', '')}.pdf',
+        ),
+      ),
+    );
   }
 }
 

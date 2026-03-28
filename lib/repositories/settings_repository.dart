@@ -42,15 +42,4 @@ class SettingsRepository {
   Future<String> getCurrencySymbol() async =>
       (await get(AppConstants.settingCurrencySymbol)) ?? AppConstants.defaultCurrencySymbol;
 
-  Future<String> getPosPrinterAddress() async =>
-      (await get(AppConstants.settingPosPrinterAddress)) ?? '';
-
-  Future<String> getPosPrinterName() async =>
-      (await get(AppConstants.settingPosPrinterName)) ?? '';
-
-  Future<String> getKitchenPrinterAddress() async =>
-      (await get(AppConstants.settingKitchenPrinterAddress)) ?? '';
-
-  Future<String> getKitchenPrinterName() async =>
-      (await get(AppConstants.settingKitchenPrinterName)) ?? '';
 }
