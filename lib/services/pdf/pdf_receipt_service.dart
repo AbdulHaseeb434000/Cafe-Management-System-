@@ -12,10 +12,11 @@ class PdfReceiptService {
   PdfReceiptService._();
   static final PdfReceiptService instance = PdfReceiptService._();
 
-  // 80 mm wide, height grows with content (thermal roll paper)
+  // 80 mm wide thermal receipt. Height is generous to fit any receipt length;
+  // maxPageWidth in PdfPreview constrains the on-screen render width.
   static final _fmt = PdfPageFormat(
     80 * PdfPageFormat.mm,
-    double.infinity,
+    600 * PdfPageFormat.mm,
     marginLeft: 4 * PdfPageFormat.mm,
     marginRight: 4 * PdfPageFormat.mm,
     marginTop: 4 * PdfPageFormat.mm,
