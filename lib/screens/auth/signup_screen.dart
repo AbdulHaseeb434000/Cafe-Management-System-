@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/supabase/supabase_service.dart';
 import '../../core/theme/app_colors.dart';
-import 'login_screen.dart' show _AuthTextField, _ErrorBanner;
+import 'auth_widgets.dart';
 
 /// Sign Up form — creates a new restaurant account.
 /// Shown as the second tab inside LoginScreen.
@@ -40,7 +40,6 @@ class _SignupFormState extends State<SignupForm> {
     setState(() { _loading = true; _error = null; });
 
     try {
-      // 1. Create Supabase auth user
       final response = await SupabaseService.signUp(
         email: _emailCtrl.text.trim(),
         password: _passCtrl.text,
@@ -49,22 +48,16 @@ class _SignupFormState extends State<SignupForm> {
       );
 
       if (response.user == null) {
-        setState(() {
-          _error = 'Signup failed. Please try again.';
-          _loading = false;
-        });
+        setState(() { _error = 'Signup failed. Please try again.'; _loading = false; });
         return;
       }
 
-      // 2. Create restaurant + owner staff rows
       await SupabaseService.createRestaurant(
         restaurantName: _restaurantCtrl.text.trim(),
         ownerName: _ownerCtrl.text.trim(),
       );
 
       if (!mounted) return;
-
-      // 3. Show trial welcome dialog then navigate home
       await _showTrialDialog();
     } on AuthException catch (e) {
       setState(() { _error = e.message; _loading = false; });
@@ -132,10 +125,10 @@ class _SignupFormState extends State<SignupForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (_error != null) ...[
-              _ErrorBanner(message: _error!),
+              AuthErrorBanner(message: _error!),
               const SizedBox(height: 16),
             ],
-            _AuthTextField(
+            AuthTextField(
               controller: _restaurantCtrl,
               label: 'Restaurant / Café Name',
               hint: 'e.g. Plato Café',
@@ -143,7 +136,7 @@ class _SignupFormState extends State<SignupForm> {
               validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 14),
-            _AuthTextField(
+            AuthTextField(
               controller: _ownerCtrl,
               label: 'Your Name',
               hint: 'e.g. Ahmed Khan',
@@ -151,7 +144,7 @@ class _SignupFormState extends State<SignupForm> {
               validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
             ),
             const SizedBox(height: 14),
-            _AuthTextField(
+            AuthTextField(
               controller: _emailCtrl,
               label: 'Email',
               hint: 'you@example.com',
@@ -160,7 +153,7 @@ class _SignupFormState extends State<SignupForm> {
                   v == null || !v.contains('@') ? 'Enter a valid email' : null,
             ),
             const SizedBox(height: 14),
-            _AuthTextField(
+            AuthTextField(
               controller: _passCtrl,
               label: 'Password',
               hint: '••••••••',
@@ -173,13 +166,12 @@ class _SignupFormState extends State<SignupForm> {
                   v == null || v.length < 6 ? 'Min. 6 characters' : null,
             ),
             const SizedBox(height: 14),
-            _AuthTextField(
+            AuthTextField(
               controller: _confirmCtrl,
               label: 'Confirm Password',
               hint: '••••••••',
               obscureText: _obscure,
-              validator: (v) =>
-                  v != _passCtrl.text ? 'Passwords do not match' : null,
+              validator: (v) => v != _passCtrl.text ? 'Passwords do not match' : null,
             ),
             const SizedBox(height: 24),
             FilledButton(
@@ -196,15 +188,17 @@ class _SignupFormState extends State<SignupForm> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : const Text('Create Account', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                  : const Text('Create Account',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             ),
             const SizedBox(height: 12),
             Text(
-              'By signing up you agree to PlatoDesk\'s Terms of Service and Privacy Policy.',
+              "By signing up you agree to PlatoDesk's Terms of Service and Privacy Policy.",
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: AppColors.textSecondary),
             ),
           ],
         ),

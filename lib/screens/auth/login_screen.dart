@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/supabase/supabase_service.dart';
 import '../../core/theme/app_colors.dart';
+import 'auth_widgets.dart';
 import 'signup_screen.dart';
 
 /// Login + Sign Up screen with tab switcher.
@@ -37,7 +38,6 @@ class _LoginScreenState extends State<LoginScreen>
         child: Column(
           children: [
             const SizedBox(height: 40),
-            // Logo
             Container(
               width: 68,
               height: 68,
@@ -56,7 +56,6 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
             ),
             const SizedBox(height: 32),
-            // Tab bar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Container(
@@ -151,19 +150,15 @@ class _LoginFormState extends State<_LoginForm> {
       if (!mounted) return;
 
       final role = staff?['role'] as String? ?? 'owner';
-      _routeByRole(role);
+      if (role == 'kitchen') {
+        context.go('/kitchen');
+      } else {
+        context.go('/');
+      }
     } on AuthException catch (e) {
       setState(() { _error = e.message; _loading = false; });
     } catch (_) {
       setState(() { _error = 'Something went wrong. Check your connection.'; _loading = false; });
-    }
-  }
-
-  void _routeByRole(String role) {
-    if (role == 'kitchen') {
-      context.go('/kitchen');
-    } else {
-      context.go('/');
     }
   }
 
@@ -192,10 +187,10 @@ class _LoginFormState extends State<_LoginForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (_error != null) ...[
-              _ErrorBanner(message: _error!),
+              AuthErrorBanner(message: _error!),
               const SizedBox(height: 16),
             ],
-            _AuthTextField(
+            AuthTextField(
               controller: _emailCtrl,
               label: 'Email',
               hint: 'you@example.com',
@@ -204,7 +199,7 @@ class _LoginFormState extends State<_LoginForm> {
                   v == null || !v.contains('@') ? 'Enter a valid email' : null,
             ),
             const SizedBox(height: 14),
-            _AuthTextField(
+            AuthTextField(
               controller: _passCtrl,
               label: 'Password',
               hint: '••••••••',
@@ -243,89 +238,6 @@ class _LoginFormState extends State<_LoginForm> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ── Shared widgets ──────────────────────────────────────────────────────────
-
-class _AuthTextField extends StatelessWidget {
-  const _AuthTextField({
-    required this.controller,
-    required this.label,
-    required this.hint,
-    this.keyboardType,
-    this.obscureText = false,
-    this.suffix,
-    this.validator,
-    this.textCapitalization = TextCapitalization.none,
-  });
-
-  final TextEditingController controller;
-  final String label;
-  final String hint;
-  final TextInputType? keyboardType;
-  final bool obscureText;
-  final Widget? suffix;
-  final String? Function(String?)? validator;
-  final TextCapitalization textCapitalization;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      textCapitalization: textCapitalization,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        suffixIcon: suffix,
-        filled: true,
-        fillColor: AppColors.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 2),
-        ),
-      ),
-      validator: validator,
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline, color: AppColors.error, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(color: AppColors.error, fontSize: 13),
-            ),
-          ),
-        ],
       ),
     );
   }
