@@ -6,8 +6,8 @@ class SupabaseService {
   SupabaseService._();
 
   // ── Replace these with your real project values from supabase.com ────────
-  static const String _supabaseUrl = 'YOUR_SUPABASE_URL';
-  static const String _supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
+  static const String _supabaseUrl = 'https://oexsuulrhqvlipvfhewd.supabase.co';
+  static const String _supabaseAnonKey = 'sb_publishable_f_KKXi_InCa0IvffkNR6-g_NEtRlraK';
   // ─────────────────────────────────────────────────────────────────────────
 
   static SupabaseClient get client => Supabase.instance.client;
