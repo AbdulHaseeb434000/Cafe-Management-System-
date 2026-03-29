@@ -5,7 +5,10 @@ workflows:
     environment:
       flutter: stable
       vars:
-        PACKAGE_NAME: "com.cafedesk.app"
+        PACKAGE_NAME: "com.platodesk.app"
+      # SUPABASE_URL and SUPABASE_ANON_KEY are stored as encrypted environment
+      # variables in the Codemagic UI (Teams → your app → Environment variables).
+      # They are automatically available here at build time.
     triggering:
       events:
         - push
@@ -29,7 +32,9 @@ workflows:
           flutter build apk \
             --release \
             --build-name=1.0.0 \
-            --build-number=$BUILD_NUMBER
+            --build-number=$BUILD_NUMBER \
+            --dart-define=SUPABASE_URL=$SUPABASE_URL \
+            --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
       - flutter_drive.log
@@ -65,6 +70,10 @@ workflows:
       - name: Flutter analyze
         script: flutter analyze
       - name: Build debug APK
-        script: flutter build apk --debug
+        script: |
+          flutter build apk \
+            --debug \
+            --dart-define=SUPABASE_URL=$SUPABASE_URL \
+            --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
     artifacts:
       - build/app/outputs/flutter-apk/app-debug.apk
