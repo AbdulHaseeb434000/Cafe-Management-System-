@@ -3,8 +3,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 
-class CafeDeskApp extends StatelessWidget {
-  const CafeDeskApp({super.key});
+class PlatoDeskApp extends StatelessWidget {
+  const PlatoDeskApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +14,7 @@ class CafeDeskApp extends StatelessWidget {
       minTextAdapt: true,
       splitScreenMode: true,
       builder: (context, child) => MaterialApp.router(
-        title: 'CafeDesk',
+        title: 'PlatoDesk',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         routerConfig: appRouter,

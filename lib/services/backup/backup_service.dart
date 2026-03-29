@@ -39,14 +39,14 @@ class BackupService {
     final dir = await getTemporaryDirectory();
     final now = DateTime.now();
     final fileName =
-        'cafedesk_backup_${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}.cafedesk';
+        'platodesk_backup_${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}.platodesk';
     final file = File('${dir.path}/$fileName');
     await file.writeAsString(json, encoding: utf8);
 
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path, mimeType: 'application/json')],
-        subject: 'CafeDesk Backup - $fileName',
+        subject: 'PlatoDesk Backup - $fileName',
       ),
     );
   }
@@ -80,7 +80,7 @@ class BackupService {
   Future<Map<String, dynamic>?> pickAndParse() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['cafedesk', 'json'],
+      allowedExtensions: ['platodesk', 'cafedesk', 'json'],
       allowMultiple: false,
     );
     if (result == null || result.files.isEmpty) return null;

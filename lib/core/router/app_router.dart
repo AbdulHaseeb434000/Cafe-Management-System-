@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../screens/auth/splash_screen.dart';
+import '../../screens/auth/login_screen.dart';
+import '../../screens/auth/paywall_screen.dart';
 import '../../screens/dashboard/dashboard_screen.dart';
 import '../../screens/menu/menu_screen.dart';
 import '../../screens/orders/orders_screen.dart';
@@ -21,9 +24,26 @@ final GlobalKey<NavigatorState> _shellNavigatorKey =
 
 final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
-  initialLocation: '/dashboard',
+  initialLocation: '/splash',
   routes: [
-    // Full-screen routes outside the shell
+    // ── Auth / onboarding ────────────────────────────────────────────────
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: '/splash',
+      builder: (context, state) => const SplashScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: '/login',
+      builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: '/paywall',
+      builder: (context, state) => const PaywallScreen(),
+    ),
+
+    // ── Full-screen routes outside the shell ─────────────────────────────
     GoRoute(
       parentNavigatorKey: _rootNavigatorKey,
       path: '/orders/new',
@@ -53,11 +73,15 @@ final appRouter = GoRouter(
       },
     ),
 
-    // Shell routes (persistent nav)
+    // ── Shell routes (persistent nav) ────────────────────────────────────
     ShellRoute(
       navigatorKey: _shellNavigatorKey,
       builder: (context, state, child) => MainScaffold(child: child),
       routes: [
+        GoRoute(
+          path: '/',
+          redirect: (_, __) => '/dashboard',
+        ),
         GoRoute(
           path: '/dashboard',
           pageBuilder: (c, s) =>

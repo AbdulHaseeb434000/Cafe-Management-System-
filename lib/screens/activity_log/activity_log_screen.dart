@@ -82,13 +82,13 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
 
     final dir = await getTemporaryDirectory();
     final today = dateFmt.format(DateTime.now());
-    final file = File('${dir.path}/cafedesk_activity_$today.csv');
+    final file = File('${dir.path}/platodesk_activity_$today.csv');
     await file.writeAsString(buf.toString());
 
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path, mimeType: 'text/csv')],
-        subject: 'CafeDesk Activity Log — $today',
+        subject: 'PlatoDesk Activity Log — $today',
       ),
     );
   }

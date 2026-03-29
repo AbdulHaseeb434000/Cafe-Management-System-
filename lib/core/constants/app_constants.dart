@@ -1,9 +1,9 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'CafeDesk';
+  static const String appName = 'PlatoDesk';
   static const String appVersion = '1.0.0';
-  static const String dbName = 'cafedesk.db';
+  static const String dbName = 'platodesk.db';
   static const int dbVersion = 2;
 
   // Settings keys

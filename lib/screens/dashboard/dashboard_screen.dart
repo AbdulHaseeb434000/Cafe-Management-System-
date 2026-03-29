@@ -44,7 +44,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final activeAsync = ref.watch(activeOrdersProvider);
     final tablesAsync = ref.watch(tablesProvider);
     final lowStockAsync = ref.watch(lowStockProvider);
-    final cafeName = settingsAsync.valueOrNull?[AppConstants.settingCafeName] ?? 'CafeDesk';
+    final cafeName = settingsAsync.valueOrNull?[AppConstants.settingCafeName] ?? 'PlatoDesk';
 
     final revenue = (_todayStats['revenue'] as num?)?.toDouble() ?? 0;
     final orderCount = (_todayStats['order_count'] as num?)?.toInt() ?? 0;

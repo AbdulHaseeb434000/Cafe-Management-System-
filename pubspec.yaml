@@ -1,5 +1,5 @@
-name: cafedesk
-description: Offline Cafe & Restaurant Management System
+name: platodesk
+description: PlatoDesk — Restaurant & Cafe Management System
 publish_to: "none"
 version: 1.0.0+1
 
@@ -36,6 +36,9 @@ dependencies:
 
   # Fonts
   google_fonts: ^6.2.1
+
+  # Backend & Auth
+  supabase_flutter: ^2.8.4
 
   # Utilities
   uuid: ^4.4.0

@@ -121,7 +121,7 @@ class MainScaffold extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'CafeDesk',
+                      'PlatoDesk',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
@@ -163,7 +163,7 @@ class MainScaffold extends StatelessWidget {
                   const Icon(Icons.local_cafe, color: Colors.white, size: 32),
                   const SizedBox(height: 8),
                   Text(
-                    'CafeDesk',
+                    'PlatoDesk',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,

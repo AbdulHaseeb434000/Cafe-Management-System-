@@ -166,7 +166,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('CafeDesk',
+                          Text('PlatoDesk',
                               style: Theme.of(context)
                                   .textTheme
                                   .titleMedium
@@ -510,7 +510,7 @@ class _BackupRestoreSectionState
               size: 22, color: AppColors.textSecondary),
           title: const Text('Export Backup'),
           subtitle: const Text(
-              'Save all data to a .cafedesk file and share to Google Drive, email, etc.'),
+              'Save all data to a .platodesk file and share to Google Drive, email, etc.'),
           trailing: _exporting
               ? const SizedBox(
                   width: 20,
@@ -526,7 +526,7 @@ class _BackupRestoreSectionState
               size: 22, color: AppColors.textSecondary),
           title: const Text('Import Backup'),
           subtitle: const Text(
-              'Restore from a .cafedesk file. Choose Merge to keep existing data.'),
+              'Restore from a .platodesk file. Choose Merge to keep existing data.'),
           trailing: _importing
               ? const SizedBox(
                   width: 20,
