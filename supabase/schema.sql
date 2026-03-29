@@ -173,6 +173,21 @@ create table activity_logs (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Expenses
+-- ─────────────────────────────────────────────────────────────────────────────
+
+create table expenses (
+  id              bigserial primary key,
+  uuid            text not null unique,
+  restaurant_id   uuid not null references restaurants(id) on delete cascade,
+  category        text not null default 'other',
+  amount          numeric(10,2) not null,
+  description     text not null default '',
+  date            date not null,
+  created_at      timestamptz not null default now()
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Billing / subscription tracking
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -210,6 +225,7 @@ alter table payments            enable row level security;
 alter table inventory_items     enable row level security;
 alter table inventory_logs      enable row level security;
 alter table activity_logs       enable row level security;
+alter table expenses            enable row level security;
 alter table billing_events      enable row level security;
 alter table device_billing_snapshots enable row level security;
 
@@ -251,6 +267,7 @@ create policy "payments_all"        on payments        for all using (restaurant
 create policy "inventory_items_all" on inventory_items for all using (restaurant_id = current_restaurant_id());
 create policy "inventory_logs_all"  on inventory_logs  for all using (restaurant_id = current_restaurant_id());
 create policy "activity_logs_all"   on activity_logs   for all using (restaurant_id = current_restaurant_id());
+create policy "expenses_all"        on expenses        for all using (restaurant_id = current_restaurant_id());
 create policy "billing_events_all"  on billing_events  for all using (restaurant_id = current_restaurant_id());
 create policy "snapshots_all"       on device_billing_snapshots for all using (restaurant_id = current_restaurant_id());
 
@@ -262,5 +279,6 @@ create index on orders          (restaurant_id, created_at desc);
 create index on order_items     (order_uuid);
 create index on payments        (order_uuid);
 create index on activity_logs   (restaurant_id, created_at desc);
+create index on expenses        (restaurant_id, date desc);
 create index on inventory_logs  (inventory_item_uuid);
 create index on staff           (auth_user_id);

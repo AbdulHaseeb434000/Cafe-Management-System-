@@ -6,8 +6,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_helpers.dart';
-import '../../providers/repository_providers.dart';
-import '../../repositories/expense_repository.dart';
+import '../../providers/repository_providers.dart';;
 
 enum _Range { today, week, month, custom }
 

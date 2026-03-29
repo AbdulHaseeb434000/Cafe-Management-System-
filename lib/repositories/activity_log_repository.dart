@@ -74,4 +74,15 @@ class ActivityLogRepository {
     final db = await _db.database;
     await db.delete(_table);
   }
+
+  /// Deletes log entries older than [days] days. Call once on app startup.
+  Future<void> purgeOlderThan(int days) async {
+    final cutoff = DateTime.now().subtract(Duration(days: days));
+    final db = await _db.database;
+    await db.delete(
+      _table,
+      where: 'created_at < ?',
+      whereArgs: [cutoff.toIso8601String()],
+    );
+  }
 }
