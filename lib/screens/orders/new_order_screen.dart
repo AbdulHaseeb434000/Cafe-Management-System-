@@ -31,7 +31,8 @@ class NewOrderScreen extends ConsumerStatefulWidget {
 }
 
 class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
-  int _step = 0; // 0=type, 1=details, 2=menu
+  // 0=type, 1=table(dine-in)/customer(others), 2=optional-customer(dine-in), 3=menu
+  int _step = 0;
 
   @override
   void initState() {
@@ -47,9 +48,25 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
             widget.preselectedTableUuid!,
             widget.preselectedTableName!,
           );
-        setState(() => _step = 2);
+        setState(() => _step = 2); // skip to optional customer step for dine-in
       }
     });
+  }
+
+  void _goBack() {
+    if (widget.preselectedTableId != null) {
+      context.pop();
+      return;
+    }
+    final orderType = ref.read(cartProvider).orderType;
+    // When going back from menu (step 3) for non-dine-in, skip step 2
+    if (_step == 3 && orderType != AppConstants.orderTypeDineIn) {
+      setState(() => _step = 1);
+    } else if (_step > 0) {
+      setState(() => _step--);
+    } else {
+      context.pop();
+    }
   }
 
   @override
@@ -59,25 +76,24 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('New Order'),
-        leading: BackButton(onPressed: () {
-          if (_step > 0 && widget.preselectedTableId == null) {
-            setState(() => _step--);
-          } else {
-            context.pop();
-          }
-        }),
+        leading: BackButton(onPressed: _goBack),
       ),
       body: IndexedStack(
         index: _step,
         children: [
+          // Step 0: order type
           _TypeSelectionStep(onSelected: (type) {
             ref.read(cartProvider.notifier).setOrderType(type);
-            setState(() => _step = type == AppConstants.orderTypeDineIn ? 1 : (type == AppConstants.orderTypeDelivery ? 1 : 2));
+            setState(() => _step = 1); // all types go to step 1
           }),
+          // Step 1: table selection (dine-in) OR customer form (takeaway/delivery)
           if (cart.orderType == AppConstants.orderTypeDineIn)
             _TableSelectionStep(onSelected: () => setState(() => _step = 2))
           else
-            _CustomerFormStep(onContinue: () => setState(() => _step = 2)),
+            _CustomerFormStep(onContinue: () => setState(() => _step = 3)),
+          // Step 2: optional customer info for dine-in (after table selection)
+          _DineInCustomerStep(onContinue: () => setState(() => _step = 3)),
+          // Step 3: menu
           _MenuStep(onPlaceOrder: _placeOrder),
         ],
       ),
@@ -383,6 +399,104 @@ class _TableSelectionStep extends ConsumerWidget {
   }
 }
 
+// ── Step 2: Optional Customer Info for Dine-In ───────────────────────────────
+
+class _DineInCustomerStep extends ConsumerStatefulWidget {
+  final VoidCallback onContinue;
+  const _DineInCustomerStep({required this.onContinue});
+
+  @override
+  ConsumerState<_DineInCustomerStep> createState() => _DineInCustomerStepState();
+}
+
+class _DineInCustomerStepState extends ConsumerState<_DineInCustomerStep> {
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Customer Info',
+              style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 4),
+          Text(
+            'Optional — identify the customer for this table',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 24),
+          TextField(
+            controller: _nameCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Name',
+              prefixIcon: Icon(Icons.person_outline),
+            ),
+            textCapitalization: TextCapitalization.words,
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _phoneCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Phone',
+              prefixIcon: Icon(Icons.phone_outlined),
+            ),
+            keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () async {
+                final name = _nameCtrl.text.trim();
+                final phone = _phoneCtrl.text.trim();
+                if (name.isNotEmpty) {
+                  final custRepo = ref.read(customerRepositoryProvider);
+                  CustomerModel? existing;
+                  if (phone.isNotEmpty) {
+                    existing = await custRepo.getByPhone(phone);
+                  }
+                  final customer = existing ??
+                      await custRepo.insert(CustomerModel.create(
+                        name: name,
+                        phone: phone.isEmpty ? null : phone,
+                      ));
+                  ref.read(cartProvider.notifier).setCustomer(
+                        id: customer.id,
+                        uuid: customer.uuid,
+                        name: customer.name,
+                      );
+                }
+                widget.onContinue();
+              },
+              child: const Text('Continue to Menu'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton(
+              onPressed: widget.onContinue,
+              child: const Text('Skip — No Customer Info'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Step 1c: Customer Form (Takeaway optional / Delivery required) ────────────
 
 class _CustomerFormStep extends ConsumerStatefulWidget {
@@ -422,7 +536,7 @@ class _CustomerFormStepState extends ConsumerState<_CustomerFormStep> {
           Text(
             isDelivery
                 ? 'Required for delivery'
-                : 'Optional for takeaway',
+                : 'Optional — skip if not needed',
             style: Theme.of(context)
                 .textTheme
                 .bodyMedium

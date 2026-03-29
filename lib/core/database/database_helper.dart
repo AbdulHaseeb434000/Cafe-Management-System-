@@ -38,6 +38,7 @@ class DatabaseHelper {
     batch.execute(_createInventoryLogs);
     batch.execute(_createSettings);
     batch.execute(_createActivityLogs);
+    batch.execute(_createExpenses);
     await batch.commit(noResult: true);
     await _seedDefaultSettings(db);
   }
@@ -45,6 +46,9 @@ class DatabaseHelper {
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute(_createActivityLogs);
+    }
+    if (oldVersion < 3) {
+      await db.execute(_createExpenses);
     }
   }
 
@@ -199,6 +203,18 @@ class DatabaseHelper {
     CREATE TABLE settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
+    )
+  ''';
+
+  static const _createExpenses = '''
+    CREATE TABLE expenses (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid        TEXT    NOT NULL UNIQUE,
+      category    TEXT    NOT NULL DEFAULT 'other',
+      amount      REAL    NOT NULL,
+      description TEXT    NOT NULL DEFAULT '',
+      date        TEXT    NOT NULL,
+      created_at  TEXT    NOT NULL
     )
   ''';
 

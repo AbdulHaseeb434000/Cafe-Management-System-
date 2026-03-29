@@ -217,8 +217,9 @@ class OrderRepository {
     return _db.rawQuery('''
       SELECT
         CAST(strftime('%H', created_at) AS INTEGER) AS hour,
-        COUNT(*)   AS order_count,
-        SUM(total) AS revenue
+        COUNT(*)                                    AS order_count,
+        SUM(total)                                  AS revenue,
+        COUNT(DISTINCT customer_id)                 AS customer_count
       FROM orders
       WHERE status = 'completed'
         AND created_at BETWEEN ? AND ?

@@ -7,8 +7,11 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_helpers.dart';
 import '../../providers/repository_providers.dart';
+import '../../repositories/expense_repository.dart';
 
 enum _Range { today, week, month, custom }
+
+enum _ReportType { sales, peakHours, topItems, payment, profitLoss }
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -19,6 +22,7 @@ class ReportsScreen extends ConsumerStatefulWidget {
 
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   _Range _range = _Range.today;
+  _ReportType _reportType = _ReportType.sales;
   DateTime? _customFrom;
   DateTime? _customTo;
   bool _loading = false;
@@ -29,6 +33,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   List<Map<String, dynamic>> _daily = [];
   List<Map<String, dynamic>> _hourly = [];
   List<Map<String, dynamic>> _paymentSplit = [];
+  List<Map<String, dynamic>> _expenses = [];
+  double _totalExpenses = 0;
 
   @override
   void initState() {
@@ -60,18 +66,22 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     setState(() => _loading = true);
     final (from, to) = _dateRange;
     final repo = ref.read(orderRepositoryProvider);
+    final expRepo = ref.read(expenseRepositoryProvider);
 
     final fSummary = repo.getSummary(from: from, to: to);
-    final fTop = repo.getTopItems(from: from, to: to, limit: 8);
+    final fTop = repo.getTopItems(from: from, to: to, limit: 10);
     final fByType = repo.getRevenueByType(from: from, to: to);
     final fDaily = repo.getDailyRevenue(from: from, to: to);
     final fHourly = _range == _Range.today
         ? repo.getHourlyRevenue(from: from, to: to)
         : Future.value(<Map<String, dynamic>>[]);
     final fPayment = repo.getPaymentSplit(from: from, to: to);
+    final fExpenses = expRepo.getByCategory(from: from, to: to);
+    final fExpTotal = expRepo.getTotalForPeriod(from: from, to: to);
 
-    final lists = await Future.wait([fTop, fByType, fDaily, fHourly, fPayment]);
     final summary = await fSummary;
+    final lists = await Future.wait([fTop, fByType, fDaily, fHourly, fPayment, fExpenses]);
+    final expTotal = await fExpTotal;
 
     if (!mounted) return;
     setState(() {
@@ -81,6 +91,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       _daily = lists[2];
       _hourly = lists[3];
       _paymentSplit = lists[4];
+      _expenses = lists[5];
+      _totalExpenses = expTotal;
       _loading = false;
     });
   }
@@ -177,95 +189,17 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
                   const SizedBox(height: 20),
 
-                  // ── Revenue trend chart ─────────────────────────────
-                  if (_range == _Range.today && _hourly.isNotEmpty) ...[
-                    _SectionHeader(
-                      title: 'Revenue by Hour',
-                      subtitle: 'Today\'s hourly breakdown',
-                    ),
-                    const SizedBox(height: 8),
-                    _HourlyBarChart(data: _hourly),
-                    const SizedBox(height: 16),
-                  ] else if (_range != _Range.today && _daily.isNotEmpty) ...[
-                    _SectionHeader(
-                      title: 'Daily Revenue',
-                      subtitle: _daily.length == 1
-                          ? '1 day with sales'
-                          : '${_daily.length} days with sales',
-                    ),
-                    const SizedBox(height: 8),
-                    _DailyBarChart(data: _daily),
-                    const SizedBox(height: 16),
-                  ],
+                  const SizedBox(height: 16),
 
-                  // ── Order type + payment split ──────────────────────
-                  LayoutBuilder(builder: (context, constraints) {
-                    final isWide = constraints.maxWidth >= 580;
-                    final hasPie = _byType.isNotEmpty;
-                    final hasPay = _paymentSplit.isNotEmpty;
+                  // ── Report type selector ────────────────────────────
+                  _ReportTypeChips(
+                    selected: _reportType,
+                    onChanged: (t) => setState(() => _reportType = t),
+                  ),
+                  const SizedBox(height: 16),
 
-                    if (!hasPie && !hasPay) return const SizedBox();
-
-                    if (isWide && hasPie && hasPay) {
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _SectionHeader(title: 'Orders by Type'),
-                                const SizedBox(height: 8),
-                                _TypePieChart(data: _byType),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _SectionHeader(title: 'Payment Methods'),
-                                const SizedBox(height: 8),
-                                _PaymentSplitCard(data: _paymentSplit),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    }
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (hasPie) ...[
-                          _SectionHeader(title: 'Orders by Type'),
-                          const SizedBox(height: 8),
-                          _TypePieChart(data: _byType),
-                          const SizedBox(height: 16),
-                        ],
-                        if (hasPay) ...[
-                          _SectionHeader(title: 'Payment Methods'),
-                          const SizedBox(height: 8),
-                          _PaymentSplitCard(data: _paymentSplit),
-                        ],
-                      ],
-                    );
-                  }),
-
-                  // ── Top items ───────────────────────────────────────
-                  if (_topItems.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    _SectionHeader(
-                      title: 'Top Selling Items',
-                      subtitle: 'By quantity sold',
-                    ),
-                    const SizedBox(height: 8),
-                    _TopItemsCard(items: _topItems),
-                  ],
-
-                  // ── Empty state ─────────────────────────────────────
-                  if (!hasData)
+                  // ── Detail section per report type ──────────────────
+                  if (!hasData && _reportType != _ReportType.profitLoss)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 48),
                       child: Column(
@@ -282,10 +216,373 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                           ),
                         ],
                       ),
-                    ),
+                    )
+                  else ...[
+                    if (_reportType == _ReportType.sales) ...[
+                      if (_range == _Range.today && _hourly.isNotEmpty) ...[
+                        _SectionHeader(
+                          title: 'Revenue by Hour',
+                          subtitle: 'Today\'s hourly breakdown',
+                        ),
+                        const SizedBox(height: 8),
+                        _HourlyBarChart(data: _hourly),
+                        const SizedBox(height: 16),
+                      ] else if (_range != _Range.today && _daily.isNotEmpty) ...[
+                        _SectionHeader(
+                          title: 'Daily Revenue',
+                          subtitle: _daily.length == 1
+                              ? '1 day with sales'
+                              : '${_daily.length} days with sales',
+                        ),
+                        const SizedBox(height: 8),
+                        _DailyBarChart(data: _daily),
+                        const SizedBox(height: 16),
+                      ],
+                      if (_byType.isNotEmpty) ...[
+                        _SectionHeader(title: 'Orders by Type'),
+                        const SizedBox(height: 8),
+                        _TypePieChart(data: _byType),
+                      ],
+                    ],
+
+                    if (_reportType == _ReportType.peakHours) ...[
+                      if (_range != _Range.today) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline, size: 15, color: AppColors.warning),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Peak Hours data is available for Today only.',
+                                  style: TextStyle(fontSize: 12, color: AppColors.warning),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (_hourly.isNotEmpty) ...[
+                        _SectionHeader(
+                          title: 'Revenue by Hour',
+                          subtitle: 'Today\'s hourly breakdown',
+                        ),
+                        const SizedBox(height: 8),
+                        _HourlyBarChart(data: _hourly),
+                        const SizedBox(height: 16),
+                        _SectionHeader(
+                          title: 'Peak Hours',
+                          subtitle: 'Orders & customers by hour',
+                        ),
+                        const SizedBox(height: 8),
+                        _PeakHoursCard(data: _hourly),
+                      ] else
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32),
+                          child: Center(
+                            child: Text('No hourly data yet today',
+                                style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                        ),
+                    ],
+
+                    if (_reportType == _ReportType.topItems) ...[
+                      if (_topItems.isNotEmpty) ...[
+                        _SectionHeader(
+                          title: 'Top Selling Items',
+                          subtitle: 'By quantity sold — top ${_topItems.length}',
+                        ),
+                        const SizedBox(height: 8),
+                        _TopItemsCard(items: _topItems),
+                      ] else
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32),
+                          child: Center(
+                            child: Text('No items sold in this period',
+                                style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                        ),
+                    ],
+
+                    if (_reportType == _ReportType.payment) ...[
+                      if (_paymentSplit.isNotEmpty) ...[
+                        _SectionHeader(title: 'Payment Methods'),
+                        const SizedBox(height: 8),
+                        _PaymentSplitCard(data: _paymentSplit),
+                      ] else
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32),
+                          child: Center(
+                            child: Text('No payment data in this period',
+                                style: TextStyle(color: AppColors.textSecondary)),
+                          ),
+                        ),
+                    ],
+
+                    if (_reportType == _ReportType.profitLoss) ...[
+                      _ProfitLossCard(
+                        revenue: revenue,
+                        totalExpenses: _totalExpenses,
+                        expensesByCategory: _expenses,
+                      ),
+                    ],
+                  ],
                 ],
               ),
             ),
+    );
+  }
+}
+
+// ── Report type chips ──────────────────────────────────────────────────────────
+
+class _ReportTypeChips extends StatelessWidget {
+  final _ReportType selected;
+  final void Function(_ReportType) onChanged;
+  const _ReportTypeChips({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _chip(Icons.show_chart, 'Sales', _ReportType.sales),
+          const SizedBox(width: 8),
+          _chip(Icons.schedule, 'Peak Hours', _ReportType.peakHours),
+          const SizedBox(width: 8),
+          _chip(Icons.star_border, 'Top Items', _ReportType.topItems),
+          const SizedBox(width: 8),
+          _chip(Icons.payments_outlined, 'Payments', _ReportType.payment),
+          const SizedBox(width: 8),
+          _chip(Icons.balance, 'P&L', _ReportType.profitLoss),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(IconData icon, String label, _ReportType type) {
+    final sel = selected == type;
+    return GestureDetector(
+      onTap: () => onChanged(type),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.primary : AppColors.surfaceVariant,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: sel ? AppColors.primary : AppColors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: sel ? Colors.white : AppColors.textSecondary),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                color: sel ? Colors.white : AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Profit & Loss card ─────────────────────────────────────────────────────────
+
+class _ProfitLossCard extends StatelessWidget {
+  final double revenue;
+  final double totalExpenses;
+  final List<Map<String, dynamic>> expensesByCategory;
+
+  const _ProfitLossCard({
+    required this.revenue,
+    required this.totalExpenses,
+    required this.expensesByCategory,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final netProfit = revenue - totalExpenses;
+    final isProfit = netProfit >= 0;
+    final profitColor = isProfit ? AppColors.success : AppColors.error;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Summary row
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: profitColor.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: profitColor.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            children: [
+              _plRow(
+                label: 'Total Revenue',
+                value: CurrencyFormatter.format(revenue),
+                color: AppColors.success,
+                icon: Icons.arrow_upward,
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Divider(height: 1, color: AppColors.divider),
+              ),
+              _plRow(
+                label: 'Total Expenses',
+                value: CurrencyFormatter.format(totalExpenses),
+                color: AppColors.error,
+                icon: Icons.arrow_downward,
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Divider(height: 1, color: AppColors.divider),
+              ),
+              _plRow(
+                label: isProfit ? 'Net Profit' : 'Net Loss',
+                value: CurrencyFormatter.format(netProfit.abs()),
+                color: profitColor,
+                icon: isProfit ? Icons.trending_up : Icons.trending_down,
+                bold: true,
+              ),
+            ],
+          ),
+        ),
+        if (expensesByCategory.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _SectionHeader(title: 'Expenses by Category'),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Column(
+              children: expensesByCategory.map((row) {
+                final cat = row['category'] as String? ?? 'Other';
+                final total = (row['total'] as num?)?.toDouble() ?? 0;
+                final count = (row['count'] as num?)?.toInt() ?? 0;
+                final ratio = totalExpenses > 0 ? total / totalExpenses : 0.0;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(cat,
+                                style: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w500)),
+                          ),
+                          Text(CurrencyFormatter.format(total),
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w700)),
+                          const SizedBox(width: 8),
+                          Text('${(ratio * 100).toStringAsFixed(0)}%',
+                              style: const TextStyle(
+                                  fontSize: 12, color: AppColors.textSecondary)),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: ratio,
+                                backgroundColor: AppColors.surfaceVariant,
+                                color: AppColors.error.withValues(alpha: 0.7),
+                                minHeight: 6,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('$count entries',
+                              style: const TextStyle(
+                                  fontSize: 10, color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ] else ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: const Center(
+              child: Text(
+                'No expenses recorded for this period.\nAdd expenses in the Expenses module.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _plRow({
+    required String label,
+    required String value,
+    required Color color,
+    required IconData icon,
+    bool bold = false,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 13, color: color),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: bold ? 14 : 13,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: bold ? 15 : 13,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1088,6 +1385,152 @@ class _TopItemsCard extends StatelessWidget {
                         textAlign: TextAlign.right,
                         style: const TextStyle(
                             fontSize: 11, color: AppColors.textSecondary),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Peak hours card ────────────────────────────────────────────────────────────
+
+class _PeakHoursCard extends StatelessWidget {
+  final List<Map<String, dynamic>> data;
+  const _PeakHoursCard({required this.data});
+
+  String _hourLabel(int hour) {
+    if (hour == 0) return '12 AM';
+    if (hour < 12) return '${hour} AM';
+    if (hour == 12) return '12 PM';
+    return '${hour - 12} PM';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (data.isEmpty) return const SizedBox();
+
+    final maxOrders = data.fold<int>(
+        0, (m, e) => ((e['order_count'] as num?)?.toInt() ?? 0) > m ? (e['order_count'] as num).toInt() : m);
+
+    // Sort by order_count descending for display
+    final sorted = [...data]..sort((a, b) =>
+        ((b['order_count'] as num?)?.toInt() ?? 0)
+            .compareTo((a['order_count'] as num?)?.toInt() ?? 0));
+
+    final peakHour = sorted.first['hour'] as int? ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Peak hour highlight
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.trending_up, size: 14, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text(
+                  'Peak: ${_hourLabel(peakHour)} — ${sorted.first['order_count']} orders',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: const [
+                SizedBox(width: 52, child: Text('Hour', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary))),
+                SizedBox(width: 8),
+                Expanded(child: SizedBox()),
+                SizedBox(width: 8),
+                SizedBox(width: 40, child: Text('Orders', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary))),
+                SizedBox(width: 8),
+                SizedBox(width: 44, child: Text('Customers', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary))),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.divider),
+          const SizedBox(height: 4),
+          ...sorted.map((row) {
+            final hour = row['hour'] as int? ?? 0;
+            final orders = (row['order_count'] as num?)?.toInt() ?? 0;
+            final customers = (row['customer_count'] as num?)?.toInt() ?? 0;
+            final ratio = maxOrders > 0 ? orders / maxOrders : 0.0;
+            final isPeak = hour == peakHour;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 52,
+                    child: Text(
+                      _hourLabel(hour),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isPeak ? FontWeight.w700 : FontWeight.w400,
+                        color: isPeak ? AppColors.primary : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: ratio,
+                        backgroundColor: AppColors.surfaceVariant,
+                        color: isPeak ? AppColors.primary : AppColors.primaryLight,
+                        minHeight: 7,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 40,
+                    child: Text(
+                      '$orders',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isPeak ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 44,
+                    child: Text(
+                      '$customers',
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ),

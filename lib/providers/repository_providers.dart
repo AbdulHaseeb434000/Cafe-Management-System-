@@ -8,6 +8,7 @@ import '../repositories/order_repository.dart';
 import '../repositories/payment_repository.dart';
 import '../repositories/inventory_repository.dart';
 import '../repositories/settings_repository.dart';
+import '../repositories/expense_repository.dart';
 
 final _db = DatabaseHelper.instance;
 
@@ -19,3 +20,4 @@ final orderRepositoryProvider = Provider((_) => OrderRepository(_db));
 final paymentRepositoryProvider = Provider((_) => PaymentRepository(_db));
 final inventoryRepositoryProvider = Provider((_) => InventoryRepository(_db));
 final settingsRepositoryProvider = Provider((_) => SettingsRepository(_db));
+final expenseRepositoryProvider  = Provider((_) => ExpenseRepository(_db));

@@ -12,6 +12,7 @@ import '../../providers/table_providers.dart';
 import '../../providers/repository_providers.dart';
 import '../../services/pdf/pdf_receipt_service.dart';
 import '../../screens/receipt/receipt_preview_screen.dart';
+import '../../screens/orders/edit_order_screen.dart';
 import '../../widgets/order_type_badge.dart';
 import '../../widgets/confirm_dialog.dart';
 
@@ -66,6 +67,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             PopupMenuButton<String>(
               onSelected: (v) => _handleAction(v, order),
               itemBuilder: (_) => [
+                const PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Edit Order')),
                 if (!order.isPreparing && !order.isReady)
                   const PopupMenuItem(
                       value: 'preparing', child: Text('Mark Preparing')),
@@ -199,18 +203,35 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            if (order.isActive && (order.isPending || order.isReady))
+            if (order.isActive) ...[
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => context.push('/billing/${order.id}'),
-                  icon: const Icon(Icons.point_of_sale),
-                  label: const Text('Proceed to Billing'),
-                  style: ElevatedButton.styleFrom(
+                child: OutlinedButton.icon(
+                  onPressed: () => _handleAction('print_kitchen', order),
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: const Text('Print Kitchen Ticket'),
+                  style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: AppColors.primary),
+                    foregroundColor: AppColors.primary,
                   ),
                 ),
               ),
+              if (order.isPending || order.isReady) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.push('/billing/${order.id}'),
+                    icon: const Icon(Icons.point_of_sale),
+                    label: const Text('Proceed to Billing'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ],
         ),
       ),
@@ -250,6 +271,13 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
 
   Future<void> _handleAction(String action, OrderModel order) async {
     switch (action) {
+      case 'edit':
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute(builder: (_) => EditOrderScreen(order: order)),
+        );
+        _load();
+        break;
       case 'preparing':
         await ref
             .read(orderRepositoryProvider)

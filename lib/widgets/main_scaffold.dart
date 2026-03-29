@@ -18,6 +18,7 @@ class MainScaffold extends StatelessWidget {
   static const _railExtras = [
     _NavItem(label: 'Kitchen', icon: Icons.soup_kitchen_outlined, activeIcon: Icons.soup_kitchen, path: '/kitchen'),
     _NavItem(label: 'Inventory', icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2, path: '/inventory'),
+    _NavItem(label: 'Expenses', icon: Icons.account_balance_wallet_outlined, activeIcon: Icons.account_balance_wallet, path: '/expenses'),
     _NavItem(label: 'Reports', icon: Icons.bar_chart_outlined, activeIcon: Icons.bar_chart, path: '/reports'),
     _NavItem(label: 'History', icon: Icons.history_outlined, activeIcon: Icons.history, path: '/activity-log'),
   ];
