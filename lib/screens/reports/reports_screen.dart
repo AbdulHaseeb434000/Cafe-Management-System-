@@ -6,7 +6,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_helpers.dart';
-import '../../providers/repository_providers.dart';;
+import '../../providers/repository_providers.dart';
 
 enum _Range { today, week, month, custom }
 
@@ -1405,7 +1405,7 @@ class _PeakHoursCard extends StatelessWidget {
 
   String _hourLabel(int hour) {
     if (hour == 0) return '12 AM';
-    if (hour < 12) return '${hour} AM';
+    if (hour < 12) return '$hour AM';
     if (hour == 12) return '12 PM';
     return '${hour - 12} PM';
   }
