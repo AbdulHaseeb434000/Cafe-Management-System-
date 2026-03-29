@@ -1,4 +1,4 @@
-package com.cafedesk.app
+package com.platodesk.app
 
 import io.flutter.embedding.android.FlutterActivity
 
