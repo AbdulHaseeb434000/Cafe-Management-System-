@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../providers/auth_providers.dart';
 import '../../services/supabase/supabase_service.dart';
 import '../../core/theme/app_colors.dart';
 import 'auth_widgets.dart';
@@ -99,14 +101,14 @@ class _LoginScreenState extends State<LoginScreen>
 
 // ── Login form ──────────────────────────────────────────────────────────────
 
-class _LoginForm extends StatefulWidget {
+class _LoginForm extends ConsumerStatefulWidget {
   const _LoginForm();
 
   @override
-  State<_LoginForm> createState() => _LoginFormState();
+  ConsumerState<_LoginForm> createState() => _LoginFormState();
 }
 
-class _LoginFormState extends State<_LoginForm> {
+class _LoginFormState extends ConsumerState<_LoginForm> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
@@ -150,6 +152,8 @@ class _LoginFormState extends State<_LoginForm> {
       if (!mounted) return;
 
       final role = staff?['role'] as String? ?? 'owner';
+      ref.read(staffRoleProvider.notifier).state = role;
+
       if (role == 'kitchen') {
         context.go('/kitchen');
       } else {

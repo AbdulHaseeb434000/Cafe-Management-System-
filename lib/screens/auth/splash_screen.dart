@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/auth_providers.dart';
 import '../../services/supabase/supabase_service.dart';
 import '../../core/theme/app_colors.dart';
 
 /// First screen shown on app launch.
 /// Checks if a Supabase session exists and routes accordingly.
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
@@ -41,18 +43,19 @@ class _SplashScreenState extends State<SplashScreen> {
         return;
       }
 
-      // Fetch staff role to decide where to land
+      // Fetch staff role, store it, then route
       final staff = await SupabaseService.fetchStaffRecord();
       if (!mounted) return;
 
       final role = staff?['role'] as String? ?? 'owner';
-      _routeByRole(role, restaurant);
+      ref.read(staffRoleProvider.notifier).state = role;
+      _routeByRole(role);
     } else {
       context.go('/login');
     }
   }
 
-  void _routeByRole(String role, Map<String, dynamic> restaurant) {
+  void _routeByRole(String role) {
     switch (role) {
       case 'kitchen':
         context.go('/kitchen');

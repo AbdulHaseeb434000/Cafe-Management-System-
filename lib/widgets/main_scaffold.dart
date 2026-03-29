@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/theme/app_colors.dart';
+import '../providers/auth_providers.dart';
 
-class MainScaffold extends StatelessWidget {
+class MainScaffold extends ConsumerWidget {
   final Widget child;
 
   const MainScaffold({super.key, required this.child});
 
+  // Full nav for owner / manager
   static const _navItems = [
     _NavItem(label: 'Dashboard', icon: Icons.home_outlined, activeIcon: Icons.home, path: '/dashboard'),
     _NavItem(label: 'Orders', icon: Icons.receipt_long_outlined, activeIcon: Icons.receipt_long, path: '/orders'),
@@ -23,29 +26,41 @@ class MainScaffold extends StatelessWidget {
     _NavItem(label: 'History', icon: Icons.history_outlined, activeIcon: Icons.history, path: '/activity-log'),
   ];
 
+  // Restricted nav for waiter role
+  static const _waiterNavItems = [
+    _NavItem(label: 'Dashboard', icon: Icons.home_outlined, activeIcon: Icons.home, path: '/dashboard'),
+    _NavItem(label: 'Orders', icon: Icons.receipt_long_outlined, activeIcon: Icons.receipt_long, path: '/orders'),
+    _NavItem(label: 'Tables', icon: Icons.table_restaurant_outlined, activeIcon: Icons.table_restaurant, path: '/tables'),
+  ];
+
   String _currentPath(BuildContext context) =>
       GoRouterState.of(context).matchedLocation;
 
-  int _bottomIndex(String path) {
-    final idx = _navItems.indexWhere((e) => path.startsWith(e.path));
+  int _bottomIndex(String path, List<_NavItem> items) {
+    final idx = items.indexWhere((e) => path.startsWith(e.path));
     return idx == -1 ? 0 : idx;
   }
 
-  int _railIndex(String path) {
-    final allItems = [..._navItems, ..._railExtras];
-    final idx = allItems.indexWhere((e) => path.startsWith(e.path));
+  int _railIndex(String path, List<_NavItem> all) {
+    final idx = all.indexWhere((e) => path.startsWith(e.path));
     return idx == -1 ? 0 : idx;
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final role = ref.watch(staffRoleProvider);
+    final isWaiter = role == 'waiter';
+    final bottomItems = isWaiter ? _waiterNavItems : _navItems;
+    final extras = isWaiter ? const <_NavItem>[] : _railExtras;
     final isTablet = MediaQuery.of(context).size.width >= 600;
-    return isTablet ? _buildTabletLayout(context) : _buildMobileLayout(context);
+    return isTablet
+        ? _buildTabletLayout(context, bottomItems, extras)
+        : _buildMobileLayout(context, bottomItems, extras);
   }
 
-  Widget _buildMobileLayout(BuildContext context) {
+  Widget _buildMobileLayout(BuildContext context, List<_NavItem> bottomItems, List<_NavItem> extras) {
     final path = _currentPath(context);
-    final idx = _bottomIndex(path);
+    final idx = _bottomIndex(path, bottomItems);
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 48,
@@ -57,10 +72,10 @@ class MainScaffold extends StatelessWidget {
           ),
         ),
         title: Text(
-          _navItems.firstWhere((e) => path.startsWith(e.path),
-                  orElse: () => _railExtras.firstWhere(
+          bottomItems.firstWhere((e) => path.startsWith(e.path),
+                  orElse: () => extras.firstWhere(
                       (e) => path.startsWith(e.path),
-                      orElse: () => _navItems.first))
+                      orElse: () => bottomItems.first))
               .label,
           style: Theme.of(context)
               .textTheme
@@ -75,8 +90,8 @@ class MainScaffold extends StatelessWidget {
         ),
         child: BottomNavigationBar(
           currentIndex: idx,
-          onTap: (i) => context.go(_navItems[i].path),
-          items: _navItems
+          onTap: (i) => context.go(bottomItems[i].path),
+          items: bottomItems
               .map(
                 (e) => BottomNavigationBarItem(
                   icon: Icon(e.icon),
@@ -87,15 +102,15 @@ class MainScaffold extends StatelessWidget {
               .toList(),
         ),
       ),
-      // Drawer for extra items on mobile
-      drawer: _buildDrawer(context, path),
+      // Drawer for extra items on mobile (hidden for waiter)
+      drawer: extras.isEmpty ? null : _buildDrawer(context, path, extras),
     );
   }
 
-  Widget _buildTabletLayout(BuildContext context) {
+  Widget _buildTabletLayout(BuildContext context, List<_NavItem> bottomItems, List<_NavItem> extras) {
     final path = _currentPath(context);
-    final allItems = [..._navItems, ..._railExtras];
-    final idx = _railIndex(path);
+    final allItems = [...bottomItems, ...extras];
+    final idx = _railIndex(path, allItems);
     return Scaffold(
       body: Row(
         children: [
@@ -148,7 +163,7 @@ class MainScaffold extends StatelessWidget {
     );
   }
 
-  Widget _buildDrawer(BuildContext context, String path) {
+  Widget _buildDrawer(BuildContext context, String path, List<_NavItem> extras) {
     return Drawer(
       backgroundColor: AppColors.surface,
       child: SafeArea(
@@ -173,7 +188,7 @@ class MainScaffold extends StatelessWidget {
                 ],
               ),
             ),
-            ..._railExtras.map(
+            ...extras.map(
               (e) => ListTile(
                 leading: Icon(
                   path.startsWith(e.path) ? e.activeIcon : e.icon,
