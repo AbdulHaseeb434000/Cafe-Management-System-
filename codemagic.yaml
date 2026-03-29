@@ -4,11 +4,10 @@ workflows:
     max_build_duration: 60
     environment:
       flutter: stable
+      groups:
+        - platodesk_secrets
       vars:
         PACKAGE_NAME: "com.platodesk.app"
-      # SUPABASE_URL and SUPABASE_ANON_KEY are stored as encrypted environment
-      # variables in the Codemagic UI (Teams → your app → Environment variables).
-      # They are automatically available here at build time.
     triggering:
       events:
         - push
@@ -51,6 +50,8 @@ workflows:
     max_build_duration: 30
     environment:
       flutter: stable
+      groups:
+        - platodesk_secrets
     triggering:
       events:
         - push
