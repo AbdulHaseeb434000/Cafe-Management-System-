@@ -1479,7 +1479,6 @@ class _PeakHoursCard extends StatelessWidget {
           ...sorted.map((row) {
             final hour = row['hour'] as int? ?? 0;
             final orders = (row['order_count'] as num?)?.toInt() ?? 0;
-            final customers = (row['customer_count'] as num?)?.toInt() ?? 0;
             final ratio = maxOrders > 0 ? orders / maxOrders : 0.0;
             final isPeak = hour == peakHour;
 

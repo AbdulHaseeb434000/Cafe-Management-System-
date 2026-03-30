@@ -40,8 +40,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               final restaurant = await SupabaseService.fetchRestaurant();
               if (!mounted) return;
               ref.read(restaurantProvider.notifier).state = restaurant;
-              ref.read(trialDaysProvider.notifier).state =
-                  SupabaseService.trialDaysLeft(restaurant);
+              if (restaurant != null) {
+                ref.read(trialDaysProvider.notifier).state =
+                    SupabaseService.trialDaysLeft(restaurant);
+              }
             },
           ),
         ],
