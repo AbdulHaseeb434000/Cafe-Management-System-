@@ -204,6 +204,25 @@ create table if not exists device_billing_snapshots (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Migrations: add columns to existing tables if they don't exist yet
+-- ─────────────────────────────────────────────────────────────────────────────
+do $$ begin
+  -- staff.invite_code (added for invite-code join flow)
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'staff' and column_name = 'invite_code'
+  ) then
+    alter table staff add column invite_code text unique;
+  end if;
+
+  -- staff.auth_user_id: make nullable if it isn't already
+  -- (pending invited staff have no auth account yet)
+  alter table staff alter column auth_user_id drop not null;
+
+exception when others then null; -- ignore if already nullable
+end $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Row Level Security (RLS)
 -- ─────────────────────────────────────────────────────────────────────────────
 
