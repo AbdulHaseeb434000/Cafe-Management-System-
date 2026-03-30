@@ -13,22 +13,31 @@ class InventoryRepository {
   static const _logsTable = 'inventory_logs';
 
   Future<List<InventoryItemModel>> getAll() async {
-    final rows = await _db.query(_itemsTable, orderBy: 'name ASC');
+    final rows = await _db.query(
+      _itemsTable,
+      where: 'is_deleted = 0',
+      orderBy: 'name ASC',
+    );
     return rows.map(InventoryItemModel.fromMap).toList();
   }
 
   Future<List<InventoryItemModel>> getLowStock() async {
     final rows = await _db.rawQuery('''
       SELECT * FROM inventory_items
-      WHERE low_stock_threshold > 0 AND quantity <= low_stock_threshold
+      WHERE is_deleted = 0
+        AND low_stock_threshold > 0
+        AND quantity <= low_stock_threshold
       ORDER BY name ASC
     ''');
     return rows.map(InventoryItemModel.fromMap).toList();
   }
 
   Future<InventoryItemModel?> getById(int id) async {
-    final rows =
-        await _db.query(_itemsTable, where: 'id = ?', whereArgs: [id]);
+    final rows = await _db.query(
+      _itemsTable,
+      where: 'id = ? AND is_deleted = 0',
+      whereArgs: [id],
+    );
     return rows.isEmpty ? null : InventoryItemModel.fromMap(rows.first);
   }
 
@@ -52,9 +61,19 @@ class InventoryRepository {
     );
   }
 
+  /// Soft-deletes an inventory item by setting [is_deleted = 1].
+  ///
+  /// The row is retained so that historical [inventory_logs] entries remain
+  /// meaningful (their FK still resolves). The item is filtered from all read
+  /// queries going forward.
   Future<void> delete(int id) async {
     final existing = await getById(id);
-    await _db.delete(_itemsTable, 'id = ?', [id]);
+    await _db.update(
+      _itemsTable,
+      {'is_deleted': 1},
+      'id = ?',
+      [id],
+    );
     if (existing != null) {
       ActivityLogRepository.instance.log(
         actionType: 'inventory_item_deleted',
@@ -105,7 +124,13 @@ class InventoryRepository {
     return rows.map(InventoryLogModel.fromMap).toList();
   }
 
-  Future<void> insertOrIgnoreItem(InventoryItemModel item) async {
+  /// Upsert an inventory item during backup restore.
+  ///
+  /// Uses [ConflictAlgorithm.replace] intentionally: on a backup import the
+  /// latest stock snapshot should win, overwriting any local quantity that may
+  /// be older than the backup. The UI warns the user before restore that
+  /// "inventory quantities will be overwritten by the backup values."
+  Future<void> insertOrReplaceItem(InventoryItemModel item) async {
     await _db.insert(_itemsTable, item.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace);
   }

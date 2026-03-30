@@ -188,7 +188,13 @@ class SupabaseService {
       // Sign the newly-created auth user out so they don't have a dangling
       // account if the invite claim fails.
       await auth.signOut();
-      if (e.toString().contains('invalid_or_used_code')) {
+      final msg = e.toString();
+      if (msg.contains('expired_code')) {
+        throw Exception(
+          'This invite code has expired. Ask your manager to generate a new one.',
+        );
+      }
+      if (msg.contains('invalid_or_used_code')) {
         throw Exception('Invalid invite code. Please check with your manager.');
       }
       rethrow;
@@ -196,21 +202,25 @@ class SupabaseService {
   }
 
   /// Add a pending staff member and return the generated invite code.
-  static Future<String> addPendingStaff({
+  /// The code expires after 72 hours; after that the staff member cannot join
+  /// and the owner must generate a new invite.
+  static Future<({String code, DateTime expiresAt})> addPendingStaff({
     required String name,
     required String role,
   }) async {
     final staff = await fetchStaffRecord();
     if (staff == null) throw Exception('Not signed in');
     final code = _generateInviteCode();
+    final expiresAt = DateTime.now().toUtc().add(const Duration(hours: 72));
     await client.from('staff').insert({
       'restaurant_id': staff['restaurant_id'],
       'name': name,
       'role': role,
       'invite_code': code,
+      'invite_expires_at': expiresAt.toIso8601String(),
       'is_active': true,
     });
-    return code;
+    return (code: code, expiresAt: expiresAt);
   }
 
   /// Deactivate a staff member (soft-delete).

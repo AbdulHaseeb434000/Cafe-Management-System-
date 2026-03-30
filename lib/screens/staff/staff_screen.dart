@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 
 import '../../services/supabase/supabase_service.dart';
 
@@ -103,9 +104,9 @@ class _StaffScreenState extends State<StaffScreen> {
     if (name.isEmpty) return;
 
     try {
-      final code = await SupabaseService.addPendingStaff(name: name, role: role);
+      final result = await SupabaseService.addPendingStaff(name: name, role: role);
       if (!mounted) return;
-      _showInviteCode(name, code);
+      _showInviteCode(name, result.code, result.expiresAt);
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -115,7 +116,8 @@ class _StaffScreenState extends State<StaffScreen> {
     }
   }
 
-  void _showInviteCode(String name, String code) {
+  void _showInviteCode(String name, String code, DateTime expiresAt) {
+    final expiryLabel = DateFormat('d MMM, h:mm a').format(expiresAt.toLocal());
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -140,9 +142,9 @@ class _StaffScreenState extends State<StaffScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'They enter this code when signing up.',
-              style: TextStyle(fontSize: 12),
+            Text(
+              'They enter this code when signing up.\nExpires: $expiryLabel',
+              style: const TextStyle(fontSize: 12),
               textAlign: TextAlign.center,
             ),
           ],
@@ -350,6 +352,10 @@ class _StaffTile extends StatelessWidget {
     final isActive = member['is_active'] as bool? ?? false;
     final isPending = member['auth_user_id'] == null;
     final inviteCode = member['invite_code'] as String?;
+    final inviteExpiresAt = member['invite_expires_at'] as String?;
+    final isExpired = isPending &&
+        inviteExpiresAt != null &&
+        DateTime.parse(inviteExpiresAt).isBefore(DateTime.now().toUtc());
 
     Widget? trailing;
     if (isCurrentUser) {
@@ -377,8 +383,13 @@ class _StaffTile extends StatelessWidget {
         title: Text(name),
         subtitle: Text(
           isPending
-              ? 'Pending · Code: ${inviteCode ?? '—'}'
+              ? isExpired
+                  ? 'Invite Expired · Code: ${inviteCode ?? '—'}'
+                  : 'Pending · Code: ${inviteCode ?? '—'}'
               : '${_label(role)} · ${isActive ? 'Active' : 'Inactive'}',
+          style: isExpired
+              ? TextStyle(color: Theme.of(context).colorScheme.error)
+              : null,
         ),
         trailing: trailing,
       ),

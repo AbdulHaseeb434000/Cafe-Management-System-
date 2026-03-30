@@ -29,16 +29,17 @@ create table if not exists restaurants (
 -- auth_user_id is nullable: NULL until an invited staff member signs up
 -- ─────────────────────────────────────────────────────────────────────────────
 create table if not exists staff (
-  id              uuid primary key default uuid_generate_v4(),
-  invite_code     text unique,
-  restaurant_id   uuid not null references restaurants(id) on delete cascade,
-  auth_user_id    uuid references auth.users(id) on delete cascade,  -- nullable for pending invites
-  name            text not null,
-  role            text not null default 'waiter'
-                    check (role in ('owner','manager','waiter','kitchen')),
-  device_name     text,
-  is_active       boolean not null default true,
-  added_at        timestamptz not null default now(),
+  id                 uuid primary key default uuid_generate_v4(),
+  invite_code        text unique,
+  invite_expires_at  timestamptz,         -- null once claimed; set on invite creation
+  restaurant_id      uuid not null references restaurants(id) on delete cascade,
+  auth_user_id       uuid references auth.users(id) on delete cascade,  -- nullable for pending invites
+  name               text not null,
+  role               text not null default 'waiter'
+                       check (role in ('owner','manager','waiter','kitchen')),
+  device_name        text,
+  is_active          boolean not null default true,
+  added_at           timestamptz not null default now(),
   unique (restaurant_id, auth_user_id)
 );
 
@@ -143,25 +144,26 @@ create table if not exists payments (
 );
 
 create table if not exists inventory_items (
-  id              bigserial primary key,
-  uuid            text not null unique,
-  restaurant_id   uuid not null references restaurants(id) on delete cascade,
-  name            text not null,
-  unit            text not null default 'kg',
-  quantity        numeric(10,3) not null default 0,
+  id                  bigserial primary key,
+  uuid                text not null unique,
+  restaurant_id       uuid not null references restaurants(id) on delete cascade,
+  name                text not null,
+  unit                text not null default 'kg',
+  quantity            numeric(10,3) not null default 0,
   low_stock_threshold numeric(10,3) not null default 0,
-  updated_at      timestamptz not null default now()
+  updated_at          timestamptz not null default now(),
+  is_deleted          boolean not null default false
 );
 
 create table if not exists inventory_logs (
-  id              bigserial primary key,
-  uuid            text not null unique,
-  restaurant_id   uuid not null references restaurants(id) on delete cascade,
-  inventory_item_id bigint references inventory_items(id) on delete set null,
+  id                  bigserial primary key,
+  uuid                text not null unique,
+  restaurant_id       uuid not null references restaurants(id) on delete cascade,
+  inventory_item_id   bigint references inventory_items(id) on delete set null,
   inventory_item_uuid text not null,
-  change_amount   numeric(10,3) not null,
-  reason          text,
-  created_at      timestamptz not null default now()
+  change_amount       numeric(10,3) not null,
+  reason              text,
+  created_at          timestamptz not null default now()
 );
 
 create table if not exists activity_logs (
@@ -234,6 +236,28 @@ do $$ begin
 exception when others then null;
 end $$;
 
+do $$ begin
+  -- staff.invite_expires_at (added for 72-hour invite code expiry)
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'staff' and column_name = 'invite_expires_at'
+  ) then
+    alter table staff add column invite_expires_at timestamptz;
+  end if;
+exception when others then null;
+end $$;
+
+do $$ begin
+  -- inventory_items.is_deleted (soft-delete flag; preserves inventory_logs history)
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'inventory_items' and column_name = 'is_deleted'
+  ) then
+    alter table inventory_items add column is_deleted boolean not null default false;
+  end if;
+exception when others then null;
+end $$;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Row Level Security (RLS)
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -287,15 +311,28 @@ as $$
 declare
   v_row staff%rowtype;
 begin
-  -- Atomically claim: only succeeds if code exists AND is not yet linked
+  -- Atomically claim: only succeeds if code exists, is not yet linked, and has
+  -- not expired. Clears both invite_code and invite_expires_at on success.
   update staff
-  set auth_user_id = auth.uid(),
-      invite_code  = null
+  set auth_user_id      = auth.uid(),
+      invite_code       = null,
+      invite_expires_at = null
   where upper(invite_code) = upper(p_code)
     and auth_user_id is null
+    and (invite_expires_at is null or invite_expires_at > now())
   returning * into v_row;
 
   if not found then
+    -- Distinguish expired from invalid for a better user message
+    if exists (
+      select 1 from staff
+      where upper(invite_code) = upper(p_code)
+        and auth_user_id is null
+        and invite_expires_at <= now()
+    ) then
+      raise exception 'expired_code'
+        using hint = 'This invite code has expired. Ask your manager to generate a new one.';
+    end if;
     raise exception 'invalid_or_used_code'
       using hint = 'The invite code is invalid or has already been used.';
   end if;

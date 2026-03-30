@@ -20,7 +20,8 @@ class SyncService {
   bool _pushing = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
-  // Tables pushed in insertion order (no FK issues for push)
+  // Tables pushed in insertion order (no FK issues for push).
+  // activity_logs is last — it has no FK dependencies on other app tables.
   static const _pushOrder = [
     'categories',
     'menu_items',
@@ -32,6 +33,7 @@ class SyncService {
     'inventory_items',
     'inventory_logs',
     'expenses',
+    'activity_logs',
   ];
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -150,6 +152,7 @@ class SyncService {
     await _pull(db, restaurantId, 'inventory_items', _upsertInventoryItem);
     await _pull(db, restaurantId, 'inventory_logs', _upsertInventoryLog);
     await _pull(db, restaurantId, 'expenses', _upsertExpense);
+    await _pull(db, restaurantId, 'activity_logs', _upsertActivityLog);
   }
 
   Future<void> _pull(
@@ -284,6 +287,7 @@ class SyncService {
         'quantity': r['quantity'] ?? 0,
         'low_stock_threshold': r['low_stock_threshold'] ?? 0,
         'updated_at': r['updated_at'],
+        'is_deleted': (r['is_deleted'] == true) ? 1 : 0,
         'sync_pending': 0,
       });
 
@@ -308,6 +312,17 @@ class SyncService {
         'amount': r['amount'],
         'description': r['description'] ?? '',
         'date': r['date'],
+        'created_at': r['created_at'],
+        'sync_pending': 0,
+      });
+
+  Future<void> _upsertActivityLog(Database db, Map<String, dynamic> r) =>
+      _upsertByUuid(db, 'activity_logs', {
+        'uuid': r['uuid'],
+        'action_type': r['action_type'],
+        'entity_type': r['entity_type'] ?? '',
+        'entity_name': r['entity_name'] ?? '',
+        'details': r['details'],
         'created_at': r['created_at'],
         'sync_pending': 0,
       });
