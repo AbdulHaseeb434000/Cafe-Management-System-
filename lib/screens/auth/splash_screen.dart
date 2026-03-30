@@ -43,6 +43,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         return;
       }
 
+      // Store trial days for the expiry banner in MainScaffold
+      ref.read(trialDaysProvider.notifier).state =
+          SupabaseService.trialDaysLeft(restaurant);
+
       // Fetch staff role, store it, then route
       final staff = await SupabaseService.fetchStaffRecord();
       if (!mounted) return;

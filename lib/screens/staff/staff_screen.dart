@@ -213,19 +213,62 @@ class _StaffScreenState extends State<StaffScreen> {
       );
     }
     if (_staff.isEmpty) {
-      return const Center(child: Text('No staff yet. Tap + to add someone.'));
+      return const Column(
+        children: [
+          _SyncNoticeBanner(),
+          Expanded(child: Center(child: Text('No staff yet. Tap + to add someone.'))),
+        ],
+      );
     }
 
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-        itemCount: _staff.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (_, i) => _StaffTile(
-          member: _staff[i],
-          onDeactivate: () => _confirmDeactivate(_staff[i]),
+    return Column(
+      children: [
+        const _SyncNoticeBanner(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+              itemCount: _staff.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (_, i) => _StaffTile(
+                member: _staff[i],
+                onDeactivate: () => _confirmDeactivate(_staff[i]),
+              ),
+            ),
+          ),
         ),
+      ],
+    );
+  }
+}
+
+class _SyncNoticeBanner extends StatelessWidget {
+  const _SyncNoticeBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.wifi_outlined,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Each device syncs data automatically when connected to the internet or Wi-Fi. '
+              'Make sure staff members have an active connection when signing in for the first time.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
+        ],
       ),
     );
   }

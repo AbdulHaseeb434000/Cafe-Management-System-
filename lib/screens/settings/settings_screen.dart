@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../services/supabase/supabase_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/constants/app_constants.dart';
@@ -78,6 +79,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
 
             const SectionHeader(title: 'Billing'),
+            const _PlanStatusTile(),
             _SettingsTile(
               icon: Icons.percent_outlined,
               label: 'Tax Rate',
@@ -333,6 +335,89 @@ class _LogoTile extends ConsumerWidget {
         .read(settingsNotifierProvider.notifier)
         .set(AppConstants.settingLogoPath, dest.path);
   }
+}
+
+// ── Settings Tile ─────────────────────────────────────────────────────────────
+
+// ── Plan Status Tile ──────────────────────────────────────────────────────────
+
+class _PlanStatusTile extends StatefulWidget {
+  const _PlanStatusTile();
+
+  @override
+  State<_PlanStatusTile> createState() => _PlanStatusTileState();
+}
+
+class _PlanStatusTileState extends State<_PlanStatusTile> {
+  Map<String, dynamic>? _restaurant;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    SupabaseService.fetchRestaurant().then((r) {
+      if (mounted) setState(() { _restaurant = r; _loading = false; });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const ListTile(
+        leading: Icon(Icons.star_outline, size: 22, color: AppColors.textSecondary),
+        title: Text('Plan'),
+        subtitle: Text('Loading…'),
+      );
+    }
+    if (_restaurant == null) return const SizedBox.shrink();
+
+    final plan = _restaurant!['plan'] as String? ?? 'trial';
+    final days = SupabaseService.trialDaysLeft(_restaurant!);
+    final isPaid = plan != 'trial' && plan != 'suspended';
+
+    String subtitle;
+    Color subtitleColor;
+    if (plan == 'suspended') {
+      subtitle = 'Suspended — contact support';
+      subtitleColor = Colors.red;
+    } else if (days != null) {
+      subtitle = days <= 0 ? 'Trial ended — upgrade to continue' : '$days day${days == 1 ? '' : 's'} left in trial';
+      subtitleColor = days <= 1 ? Colors.red : AppColors.textSecondary;
+    } else {
+      subtitle = 'Active';
+      subtitleColor = Colors.green.shade700;
+    }
+
+    return ListTile(
+      leading: Icon(
+        isPaid ? Icons.verified_outlined : Icons.hourglass_bottom_outlined,
+        size: 22,
+        color: isPaid ? Colors.green.shade700 : AppColors.primary,
+      ),
+      title: Text(_planLabel(plan)),
+      subtitle: Text(subtitle, style: TextStyle(color: subtitleColor)),
+      trailing: (!isPaid)
+          ? FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                visualDensity: VisualDensity.compact,
+              ),
+              onPressed: () => context.go('/paywall'),
+              child: const Text('Upgrade'),
+            )
+          : null,
+    );
+  }
+
+  String _planLabel(String plan) => switch (plan) {
+        'trial' => 'Free Trial',
+        'starter' => 'Starter Plan',
+        'standard' => 'Standard Plan',
+        'business' => 'Business Plan',
+        'suspended' => 'Suspended',
+        _ => plan,
+      };
 }
 
 // ── Settings Tile ─────────────────────────────────────────────────────────────

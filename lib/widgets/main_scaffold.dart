@@ -49,13 +49,25 @@ class MainScaffold extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final role = ref.watch(staffRoleProvider);
+    final trialDays = ref.watch(trialDaysProvider);
     final isWaiter = role == 'waiter';
     final bottomItems = isWaiter ? _waiterNavItems : _navItems;
     final extras = isWaiter ? const <_NavItem>[] : _railExtras;
     final isTablet = MediaQuery.of(context).size.width >= 600;
-    return isTablet
+    final base = isTablet
         ? _buildTabletLayout(context, bottomItems, extras)
         : _buildMobileLayout(context, bottomItems, extras);
+
+    // Show amber warning banner on the last day of the trial
+    if (trialDays != null && trialDays <= 0) {
+      return Column(
+        children: [
+          _TrialExpiryBanner(onUpgrade: () => context.go('/paywall')),
+          Expanded(child: base),
+        ],
+      );
+    }
+    return base;
   }
 
   Widget _buildMobileLayout(BuildContext context, List<_NavItem> bottomItems, List<_NavItem> extras) {
@@ -211,6 +223,46 @@ class MainScaffold extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TrialExpiryBanner extends StatelessWidget {
+  const _TrialExpiryBanner({required this.onUpgrade});
+  final VoidCallback onUpgrade;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFFFF3CD), // amber-50
+      child: InkWell(
+        onTap: onUpgrade,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded,
+                  size: 18, color: Color(0xFF856404)),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Your free trial ends today — upgrade in Settings to keep access.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF856404)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Upgrade',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
