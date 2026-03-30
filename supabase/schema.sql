@@ -1,5 +1,6 @@
 -- PlatoDesk — Supabase Schema
--- Run this in the Supabase SQL Editor (app.supabase.com → SQL Editor → New query)
+-- Safe to re-run: uses IF NOT EXISTS and DROP IF EXISTS throughout.
+-- Run this in: app.supabase.com → SQL Editor → New query
 -- Region: ap-south-1 (Mumbai)
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -10,7 +11,7 @@ create extension if not exists "uuid-ossp";
 -- ─────────────────────────────────────────────────────────────────────────────
 -- restaurants
 -- ─────────────────────────────────────────────────────────────────────────────
-create table restaurants (
+create table if not exists restaurants (
   id              uuid primary key default uuid_generate_v4(),
   name            text not null,
   owner_email     text not null,
@@ -25,12 +26,13 @@ create table restaurants (
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- staff
+-- auth_user_id is nullable: NULL until an invited staff member signs up
 -- ─────────────────────────────────────────────────────────────────────────────
-create table staff (
+create table if not exists staff (
   id              uuid primary key default uuid_generate_v4(),
   invite_code     text unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
-  auth_user_id    uuid not null references auth.users(id) on delete cascade,
+  auth_user_id    uuid references auth.users(id) on delete cascade,  -- nullable for pending invites
   name            text not null,
   role            text not null default 'waiter'
                     check (role in ('owner','manager','waiter','kitchen')),
@@ -41,10 +43,10 @@ create table staff (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- App data tables (mirrors SQLite schema — restaurant_id added to every table)
+-- App data tables (mirrors SQLite schema — restaurant_id on every table)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-create table categories (
+create table if not exists categories (
   id              bigserial primary key,
   uuid            text not null unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
@@ -54,7 +56,7 @@ create table categories (
   created_at      timestamptz not null default now()
 );
 
-create table menu_items (
+create table if not exists menu_items (
   id              bigserial primary key,
   uuid            text not null unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
@@ -68,7 +70,7 @@ create table menu_items (
   created_at      timestamptz not null default now()
 );
 
-create table cafe_tables (
+create table if not exists cafe_tables (
   id              bigserial primary key,
   uuid            text not null unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
@@ -78,7 +80,7 @@ create table cafe_tables (
                     check (status in ('free','occupied','reserved'))
 );
 
-create table customers (
+create table if not exists customers (
   id              bigserial primary key,
   uuid            text not null unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
@@ -88,7 +90,7 @@ create table customers (
   created_at      timestamptz not null default now()
 );
 
-create table orders (
+create table if not exists orders (
   id              bigserial primary key,
   uuid            text not null unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
@@ -113,7 +115,7 @@ create table orders (
   completed_at    timestamptz
 );
 
-create table order_items (
+create table if not exists order_items (
   id              bigserial primary key,
   uuid            text not null unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
@@ -127,7 +129,7 @@ create table order_items (
   note            text
 );
 
-create table payments (
+create table if not exists payments (
   id              bigserial primary key,
   uuid            text not null unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
@@ -139,7 +141,7 @@ create table payments (
   paid_at         timestamptz not null default now()
 );
 
-create table inventory_items (
+create table if not exists inventory_items (
   id              bigserial primary key,
   uuid            text not null unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
@@ -150,7 +152,7 @@ create table inventory_items (
   updated_at      timestamptz not null default now()
 );
 
-create table inventory_logs (
+create table if not exists inventory_logs (
   id              bigserial primary key,
   uuid            text not null unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
@@ -161,7 +163,7 @@ create table inventory_logs (
   created_at      timestamptz not null default now()
 );
 
-create table activity_logs (
+create table if not exists activity_logs (
   id              bigserial primary key,
   uuid            text not null unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
@@ -173,11 +175,7 @@ create table activity_logs (
   created_at      timestamptz not null default now()
 );
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Expenses
--- ─────────────────────────────────────────────────────────────────────────────
-
-create table expenses (
+create table if not exists expenses (
   id              bigserial primary key,
   uuid            text not null unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
@@ -188,11 +186,7 @@ create table expenses (
   created_at      timestamptz not null default now()
 );
 
--- ─────────────────────────────────────────────────────────────────────────────
--- Billing / subscription tracking
--- ─────────────────────────────────────────────────────────────────────────────
-
-create table billing_events (
+create table if not exists billing_events (
   id              uuid primary key default uuid_generate_v4(),
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
   device_id       uuid references staff(id) on delete set null,
@@ -201,7 +195,7 @@ create table billing_events (
   effective_date  timestamptz not null default now()
 );
 
-create table device_billing_snapshots (
+create table if not exists device_billing_snapshots (
   id              uuid primary key default uuid_generate_v4(),
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
   period_start    timestamptz not null,
@@ -211,26 +205,25 @@ create table device_billing_snapshots (
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Row Level Security (RLS)
--- Each restaurant can only access its own data.
 -- ─────────────────────────────────────────────────────────────────────────────
 
-alter table restaurants         enable row level security;
-alter table staff               enable row level security;
-alter table categories          enable row level security;
-alter table menu_items          enable row level security;
-alter table cafe_tables         enable row level security;
-alter table customers           enable row level security;
-alter table orders              enable row level security;
-alter table order_items         enable row level security;
-alter table payments            enable row level security;
-alter table inventory_items     enable row level security;
-alter table inventory_logs      enable row level security;
-alter table activity_logs       enable row level security;
-alter table expenses            enable row level security;
-alter table billing_events      enable row level security;
+alter table restaurants              enable row level security;
+alter table staff                    enable row level security;
+alter table categories               enable row level security;
+alter table menu_items               enable row level security;
+alter table cafe_tables              enable row level security;
+alter table customers                enable row level security;
+alter table orders                   enable row level security;
+alter table order_items              enable row level security;
+alter table payments                 enable row level security;
+alter table inventory_items          enable row level security;
+alter table inventory_logs           enable row level security;
+alter table activity_logs            enable row level security;
+alter table expenses                 enable row level security;
+alter table billing_events           enable row level security;
 alter table device_billing_snapshots enable row level security;
 
--- Helper function: get restaurant_id for the current auth user
+-- Helper function: resolve restaurant_id for the signed-in user
 create or replace function current_restaurant_id()
 returns uuid
 language sql
@@ -243,21 +236,48 @@ as $$
   limit 1;
 $$;
 
--- restaurants: user can only see their own restaurant
+-- Drop existing policies before recreating (idempotent)
+do $$ begin
+  drop policy if exists "restaurant_select"  on restaurants;
+  drop policy if exists "restaurant_insert"  on restaurants;
+  drop policy if exists "restaurant_update"  on restaurants;
+  drop policy if exists "staff_all"          on staff;
+  drop policy if exists "staff_invite_select" on staff;
+  drop policy if exists "categories_all"     on categories;
+  drop policy if exists "menu_items_all"     on menu_items;
+  drop policy if exists "cafe_tables_all"    on cafe_tables;
+  drop policy if exists "customers_all"      on customers;
+  drop policy if exists "orders_all"         on orders;
+  drop policy if exists "order_items_all"    on order_items;
+  drop policy if exists "payments_all"       on payments;
+  drop policy if exists "inventory_items_all" on inventory_items;
+  drop policy if exists "inventory_logs_all" on inventory_logs;
+  drop policy if exists "activity_logs_all"  on activity_logs;
+  drop policy if exists "expenses_all"       on expenses;
+  drop policy if exists "billing_events_all" on billing_events;
+  drop policy if exists "snapshots_all"      on device_billing_snapshots;
+end $$;
+
+-- restaurants
 create policy "restaurant_select" on restaurants
   for select using (id = current_restaurant_id());
 
 create policy "restaurant_insert" on restaurants
-  for insert with check (true); -- allowed during signup
+  for insert with check (true);  -- allowed during signup before staff row exists
 
 create policy "restaurant_update" on restaurants
   for update using (id = current_restaurant_id());
 
--- staff: users in the same restaurant
+-- staff: existing members see their restaurant's staff
 create policy "staff_all" on staff
   for all using (restaurant_id = current_restaurant_id());
 
--- All app data tables: scoped to current restaurant
+-- Allow reading a pending staff row by invite_code during signup
+-- (unauthenticated select needed so joinWithInviteCode can find the row)
+create policy "staff_invite_select" on staff
+  for select using (invite_code is not null);
+
+-- All app-data tables: scoped to current restaurant
 create policy "categories_all"      on categories      for all using (restaurant_id = current_restaurant_id());
 create policy "menu_items_all"      on menu_items      for all using (restaurant_id = current_restaurant_id());
 create policy "cafe_tables_all"     on cafe_tables     for all using (restaurant_id = current_restaurant_id());
@@ -273,13 +293,13 @@ create policy "billing_events_all"  on billing_events  for all using (restaurant
 create policy "snapshots_all"       on device_billing_snapshots for all using (restaurant_id = current_restaurant_id());
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Indexes for common query patterns
+-- Indexes
 -- ─────────────────────────────────────────────────────────────────────────────
 
-create index on orders          (restaurant_id, created_at desc);
-create index on order_items     (order_uuid);
-create index on payments        (order_uuid);
-create index on activity_logs   (restaurant_id, created_at desc);
-create index on expenses        (restaurant_id, date desc);
-create index on inventory_logs  (inventory_item_uuid);
-create index on staff           (auth_user_id);
+create index if not exists idx_orders_restaurant     on orders          (restaurant_id, created_at desc);
+create index if not exists idx_order_items_uuid      on order_items     (order_uuid);
+create index if not exists idx_payments_uuid         on payments        (order_uuid);
+create index if not exists idx_activity_logs         on activity_logs   (restaurant_id, created_at desc);
+create index if not exists idx_expenses              on expenses        (restaurant_id, date desc);
+create index if not exists idx_inventory_logs_uuid   on inventory_logs  (inventory_item_uuid);
+create index if not exists idx_staff_auth_user       on staff           (auth_user_id);
