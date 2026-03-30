@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/auth_providers.dart';
 import '../../services/supabase/supabase_service.dart';
 import '../../core/theme/app_colors.dart';
+import '../../services/sync/sync_service.dart';
 import 'auth_widgets.dart';
 import 'signup_screen.dart';
 
@@ -163,6 +165,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
       final role = staff?['role'] as String? ?? 'owner';
       ref.read(staffRoleProvider.notifier).state = role;
 
+      unawaited(SyncService.instance.triggerOnLogin());
       if (role == 'kitchen') {
         context.go('/kitchen');
       } else {

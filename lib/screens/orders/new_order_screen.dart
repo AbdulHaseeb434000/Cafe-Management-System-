@@ -323,10 +323,30 @@ class _TableSelectionStep extends ConsumerWidget {
         final freeTables =
             tables.where((t) => t.isFree || t.isReserved).toList();
         if (freeTables.isEmpty) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(32),
-              child: Text('No free tables available'),
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.table_restaurant_outlined,
+                      size: 48, color: Colors.grey),
+                  const SizedBox(height: 12),
+                  const Text('No free tables available',
+                      style: TextStyle(fontSize: 16)),
+                  const SizedBox(height: 20),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: const Text('Go to Tables'),
+                    onPressed: () => context.go('/tables'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: onSelected,
+                    child: const Text('Continue without table'),
+                  ),
+                ],
+              ),
             ),
           );
         }

@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sqflite/sqflite.dart';
+import '../../core/database/database_helper.dart';
 import '../../providers/auth_providers.dart';
 import '../../services/supabase/supabase_service.dart';
 import '../../core/theme/app_colors.dart';
@@ -27,12 +30,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     if (!mounted) return;
 
     if (SupabaseService.isSignedIn) {
-      // Fetch restaurant to check plan status
-      final restaurant = await SupabaseService.fetchRestaurant();
+      Map<String, dynamic>? restaurant;
+      bool fromCache = false;
+
+      try {
+        restaurant = await SupabaseService.fetchRestaurant();
+        if (restaurant != null) {
+          // Persist for offline use
+          await _cacheRestaurant(restaurant);
+        }
+      } catch (_) {
+        // Network error — fall back to local cache
+        restaurant = await _loadCachedRestaurant();
+        fromCache = restaurant != null;
+      }
+
       if (!mounted) return;
 
       if (restaurant == null) {
-        // Auth user exists but no restaurant record — go to login
+        // No restaurant found online and no cache — incomplete setup or new device
         context.go('/login');
         return;
       }
@@ -48,15 +64,64 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       ref.read(trialDaysProvider.notifier).state =
           SupabaseService.trialDaysLeft(restaurant);
 
-      // Fetch staff role, store it, then route
-      final staff = await SupabaseService.fetchStaffRecord();
-      if (!mounted) return;
+      String role = 'owner';
+      if (!fromCache) {
+        // Fetch staff role from Supabase (only possible when online)
+        final staff = await SupabaseService.fetchStaffRecord();
+        if (!mounted) return;
+        role = staff?['role'] as String? ?? 'owner';
+        await _cacheStaffRole(role);
+      } else {
+        // Offline — use cached role
+        role = await _loadCachedStaffRole() ?? 'owner';
+      }
 
-      final role = staff?['role'] as String? ?? 'owner';
       ref.read(staffRoleProvider.notifier).state = role;
       _routeByRole(role);
     } else {
       context.go('/login');
+    }
+  }
+
+  Future<void> _cacheRestaurant(Map<String, dynamic> restaurant) async {
+    final db = await DatabaseHelper.instance.database;
+    await db.insert(
+      'settings',
+      {'key': 'cached_restaurant', 'value': jsonEncode(restaurant)},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<Map<String, dynamic>?> _loadCachedRestaurant() async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final rows = await db.query('settings',
+          where: 'key = ?', whereArgs: ['cached_restaurant']);
+      if (rows.isEmpty) return null;
+      return Map<String, dynamic>.from(
+          jsonDecode(rows.first['value'] as String) as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _cacheStaffRole(String role) async {
+    final db = await DatabaseHelper.instance.database;
+    await db.insert(
+      'settings',
+      {'key': 'cached_staff_role', 'value': role},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<String?> _loadCachedStaffRole() async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final rows = await db.query('settings',
+          where: 'key = ?', whereArgs: ['cached_staff_role']);
+      return rows.isEmpty ? null : rows.first['value'] as String?;
+    } catch (_) {
+      return null;
     }
   }
 

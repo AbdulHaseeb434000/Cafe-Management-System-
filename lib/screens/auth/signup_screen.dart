@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/app_constants.dart';
+import '../../services/sync/sync_service.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/settings_providers.dart';
 import '../../services/supabase/supabase_service.dart';
@@ -80,6 +82,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
     );
 
     ref.read(staffRoleProvider.notifier).state = 'owner';
+    unawaited(SyncService.instance.triggerOnLogin());
 
     if (!mounted) return;
     await _showCurrencyDialog();
@@ -98,7 +101,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'What currency symbol does your café use?',
+              'What currency symbol does your restaurant use?',
               style: TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 16),
@@ -141,6 +144,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
 
     final role = staff['role'] as String? ?? 'waiter';
     ref.read(staffRoleProvider.notifier).state = role;
+    unawaited(SyncService.instance.triggerOnLogin());
 
     if (!mounted) return;
     if (role == 'kitchen') {

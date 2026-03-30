@@ -35,6 +35,7 @@ class AuthTextField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
+        floatingLabelBehavior: FloatingLabelBehavior.always,
         suffixIcon: suffix,
         filled: true,
         fillColor: AppColors.surface,

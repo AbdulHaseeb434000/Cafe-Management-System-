@@ -167,6 +167,37 @@ class _StaffScreenState extends State<StaffScreen> {
     );
   }
 
+  Future<void> _confirmReactivate(Map<String, dynamic> member) async {
+    final name = member['name'] as String? ?? 'this staff member';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reactivate Staff'),
+        content: Text('Restore $name to the team? They will regain app access.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reactivate'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await SupabaseService.reactivateStaff(member['id'] as String);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
   Future<void> _confirmDeactivate(Map<String, dynamic> member) async {
     final name = member['name'] as String? ?? 'this staff member';
     final confirmed = await showDialog<bool>(
@@ -258,6 +289,7 @@ class _StaffScreenState extends State<StaffScreen> {
                 member: _staff[i],
                 isCurrentUser: _staff[i]['auth_user_id'] == _currentAuthUserId,
                 onDeactivate: () => _confirmDeactivate(_staff[i]),
+                onReactivate: () => _confirmReactivate(_staff[i]),
               ),
             ),
           ),
@@ -303,11 +335,13 @@ class _StaffTile extends StatelessWidget {
     required this.member,
     required this.isCurrentUser,
     required this.onDeactivate,
+    required this.onReactivate,
   });
 
   final Map<String, dynamic> member;
   final bool isCurrentUser;
   final VoidCallback onDeactivate;
+  final VoidCallback onReactivate;
 
   @override
   Widget build(BuildContext context) {
@@ -330,7 +364,11 @@ class _StaffTile extends StatelessWidget {
         onPressed: onDeactivate,
       );
     } else {
-      trailing = const Icon(Icons.block, color: Colors.grey);
+      trailing = IconButton(
+        icon: const Icon(Icons.refresh, color: Colors.green),
+        tooltip: 'Reactivate',
+        onPressed: onReactivate,
+      );
     }
 
     return Card(

@@ -39,13 +39,16 @@ class SyncService {
   /// Call once after Supabase.initialize(). Starts push + connectivity watcher.
   void start() {
     unawaited(_syncOnStart());
-    _connectivitySub = Connectivity()
+    _connectivitySub ??= Connectivity()
         .onConnectivityChanged
         .listen((results) {
       final online = results.any((r) => r != ConnectivityResult.none);
       if (online) unawaited(push());
     });
   }
+
+  /// Re-trigger sync after login without adding another connectivity listener.
+  Future<void> triggerOnLogin() => _syncOnStart();
 
   void dispose() {
     _connectivitySub?.cancel();

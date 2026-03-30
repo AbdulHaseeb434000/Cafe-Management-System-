@@ -88,6 +88,13 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
         0;
   }
 
+  String get _currencySymbol {
+    final settings =
+        ref.read(settingsNotifierProvider).valueOrNull ?? {};
+    return settings[AppConstants.settingCurrencySymbol] ??
+        AppConstants.defaultCurrencySymbol;
+  }
+
   double get _taxableAmount => _subtotal - _discountAmount;
   double get _taxAmount => _taxableAmount * _taxPercent / 100;
   double get _total => _taxableAmount + _taxAmount;
@@ -180,7 +187,7 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
                   children: [
                     Expanded(
                       child: _ToggleButton(
-                        label: 'Flat (Rs.)',
+                        label: 'Flat ($_currencySymbol)',
                         selected: _discountType ==
                             AppConstants.discountTypeFlat,
                         onTap: () => setState(() {
@@ -286,9 +293,9 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
                     controller: _tenderedCtrl,
                     keyboardType: const TextInputType.numberWithOptions(
                         decimal: true),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                         labelText: 'Amount Tendered',
-                        prefixText: 'Rs. '),
+                        prefixText: '$_currencySymbol '),
                     onChanged: (_) => setState(() {}),
                   ),
                   if (_tenderedCtrl.text.isNotEmpty) ...[

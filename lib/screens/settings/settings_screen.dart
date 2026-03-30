@@ -53,16 +53,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (settings) => ListView(
           children: [
-            const SectionHeader(title: 'Cafe Info'),
+            const SectionHeader(title: 'Restaurant Info'),
             _LogoTile(settings: settings),
             _SettingsTile(
               icon: Icons.store_outlined,
-              label: 'Cafe Name',
-              value: settings[AppConstants.settingCafeName] ?? 'My Cafe',
+              label: 'Restaurant Name',
+              value: settings[AppConstants.settingCafeName] ?? 'My Restaurant',
               onTap: () => _editSetting(
                 context,
                 key: AppConstants.settingCafeName,
-                label: 'Cafe Name',
+                label: 'Restaurant Name',
                 current: settings[AppConstants.settingCafeName] ?? '',
               ),
             ),
@@ -199,7 +199,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           color: AppColors.primary,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.local_cafe,
+                        child: const Icon(Icons.restaurant,
                             color: Colors.white, size: 22),
                       ),
                       const SizedBox(width: 12),
@@ -240,6 +240,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ],
               ),
+            ),
+
+            const SectionHeader(title: 'Account'),
+            ListTile(
+              leading: const Icon(Icons.logout, size: 22, color: AppColors.error),
+              title: const Text('Sign Out',
+                  style: TextStyle(color: AppColors.error)),
+              onTap: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Sign Out'),
+                    content: const Text('Are you sure you want to sign out?'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel')),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.error),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Sign Out'),
+                      ),
+                    ],
+                  ),
+                );
+                if (ok == true && mounted) {
+                  await SupabaseService.signOut();
+                  if (mounted) context.go('/login');
+                }
+              },
             ),
 
             const SizedBox(height: 32),

@@ -222,6 +222,14 @@ class SupabaseService {
         .eq('id', staffId);
   }
 
+  /// Reactivate a previously deactivated staff member.
+  static Future<void> reactivateStaff(String staffId) async {
+    await client
+        .from('staff')
+        .update({'is_active': true})
+        .eq('id', staffId);
+  }
+
   static String _generateInviteCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final rand = Random.secure();

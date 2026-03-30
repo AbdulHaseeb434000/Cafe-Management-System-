@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/currency_formatter.dart';
 import '../../models/category_model.dart';
 import '../../models/menu_item_model.dart';
 import '../../providers/menu_providers.dart';
+import '../../providers/settings_providers.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/confirm_dialog.dart';
 
@@ -281,6 +284,9 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
 
   void _showItemDialog(BuildContext context,
       {MenuItemModel? existing, required CategoryModel category}) {
+    final settings = ref.read(settingsNotifierProvider).valueOrNull ?? {};
+    final currencySymbol = settings[AppConstants.settingCurrencySymbol] ??
+        AppConstants.defaultCurrencySymbol;
     final nameCtrl =
         TextEditingController(text: existing?.name ?? '');
     final priceCtrl = TextEditingController(
@@ -305,9 +311,9 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
               const SizedBox(height: 12),
               TextField(
                 controller: priceCtrl,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Price *',
-                  prefixText: 'Rs. ',
+                  prefixText: '$currencySymbol ',
                 ),
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
@@ -371,6 +377,9 @@ class _ItemTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsNotifierProvider).valueOrNull ?? {};
+    final currencySymbol = settings[AppConstants.settingCurrencySymbol] ??
+        AppConstants.defaultCurrencySymbol;
     return ListTile(
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -393,7 +402,7 @@ class _ItemTile extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Rs. ${item.price.toStringAsFixed(2)}',
+            CurrencyFormatter.format(item.price, symbol: currencySymbol),
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   color: AppColors.primaryDark,
                   fontWeight: FontWeight.w600,
