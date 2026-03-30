@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/theme/app_colors.dart';
 import '../providers/auth_providers.dart';
+import '../providers/settings_providers.dart';
 
 class MainScaffold extends ConsumerWidget {
   final Widget child;
@@ -50,6 +51,8 @@ class MainScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final role = ref.watch(staffRoleProvider);
     final trialDays = ref.watch(trialDaysProvider);
+    // Pre-load settings so they are ready for PDF generation on any screen.
+    ref.watch(settingsNotifierProvider);
     final isWaiter = role == 'waiter';
     final bottomItems = isWaiter ? _waiterNavItems : _navItems;
     final extras = isWaiter ? const <_NavItem>[] : _railExtras;

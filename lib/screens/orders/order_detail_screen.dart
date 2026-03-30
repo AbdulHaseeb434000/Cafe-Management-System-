@@ -67,9 +67,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             PopupMenuButton<String>(
               onSelected: (v) => _handleAction(v, order),
               itemBuilder: (_) => [
-                const PopupMenuItem(
-                    value: 'edit',
-                    child: Text('Edit Order')),
+                PopupMenuItem(
+                    value: order.isLocked ? 'force_edit' : 'edit',
+                    child: Text(order.isLocked ? 'Force Edit Order' : 'Edit Order')),
                 if (!order.isPreparing && !order.isReady)
                   const PopupMenuItem(
                       value: 'preparing', child: Text('Mark Preparing')),
@@ -91,6 +91,34 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Kitchen lock banner
+            if (order.isLocked && order.isActive)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.soup_kitchen_outlined,
+                        size: 16, color: Colors.orange.shade700),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'This order is being prepared in the kitchen.',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _handleAction('force_edit', order),
+                      child: const Text('Force Edit'),
+                    ),
+                  ],
+                ),
+              ),
             // Header card
             _card(
               child: Column(
@@ -272,6 +300,15 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
   Future<void> _handleAction(String action, OrderModel order) async {
     switch (action) {
       case 'edit':
+      case 'force_edit':
+        if (action == 'force_edit') {
+          final ok = await showConfirmDialog(context,
+              title: 'Force Edit Order',
+              message: 'This order has been sent to the kitchen. Editing it may cause confusion. Continue?',
+              confirmLabel: 'Edit Anyway');
+          if (!ok) return;
+          await ref.read(orderRepositoryProvider).setLocked(order.id!, locked: false);
+        }
         await Navigator.push<void>(
           context,
           MaterialPageRoute(builder: (_) => EditOrderScreen(order: order)),
@@ -293,9 +330,15 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         ref.read(activeOrdersProvider.notifier).load();
         break;
       case 'print_kitchen':
-        final pdfBytes =
-            await PdfReceiptService.instance.buildKitchenTicket(order);
+        // Reload fresh order to ensure items are up-to-date (esp. after edit)
+        final freshOrder =
+            await ref.read(orderRepositoryProvider).getById(order.id!) ?? order;
         if (!mounted) return;
+        final pdfBytes =
+            await PdfReceiptService.instance.buildKitchenTicket(freshOrder);
+        if (!mounted) return;
+        // Lock the order to signal kitchen is preparing
+        await ref.read(orderRepositoryProvider).setLocked(order.id!, locked: true);
         await Navigator.push<void>(
           context,
           MaterialPageRoute(
@@ -306,6 +349,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
             ),
           ),
         );
+        _load();
+        ref.read(activeOrdersProvider.notifier).load();
         break;
       case 'cancel':
         final ok = await showConfirmDialog(

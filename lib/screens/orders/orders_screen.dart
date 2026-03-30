@@ -753,7 +753,8 @@ class _HistoryOrderTile extends StatelessWidget {
                               fontSize: 11,
                               color: AppColors.textSecondary),
                         ),
-                      ] else if (order.customerName != null) ...[
+                      ],
+                      if (order.customerName != null) ...[
                         const SizedBox(width: 8),
                         Icon(Icons.person_outline,
                             size: 11, color: AppColors.textSecondary),

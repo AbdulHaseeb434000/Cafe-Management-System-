@@ -546,5 +546,12 @@ class _ActionMeta {
         'Stock Item Deleted', Icons.delete_outline, Colors.red),
     'inventory_adjusted':
         _ActionMeta('Stock Adjusted', Icons.tune, Colors.deepPurple),
+
+    'expense_created':
+        _ActionMeta('Expense Added', Icons.receipt_outlined, Colors.green),
+    'expense_updated':
+        _ActionMeta('Expense Updated', Icons.edit_outlined, AppColors.primary),
+    'expense_deleted':
+        _ActionMeta('Expense Deleted', Icons.delete_outline, Colors.red),
   };
 }

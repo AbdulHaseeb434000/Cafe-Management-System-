@@ -939,13 +939,17 @@ class _MenuItemCard extends ConsumerWidget {
                           child: const Icon(Icons.remove, size: 14),
                         ),
                       ),
-                      Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 6),
-                        child: Text('$qty',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13)),
+                      GestureDetector(
+                        onTap: () => _showQtyDialog(context, ref, item, qty),
+                        child: Padding(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text('$qty',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  decoration: TextDecoration.underline)),
+                        ),
                       ),
                       GestureDetector(
                         onTap: () =>
@@ -964,6 +968,44 @@ class _MenuItemCard extends ConsumerWidget {
                   ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQtyDialog(
+      BuildContext context, WidgetRef ref, MenuItemModel item, int currentQty) {
+    final ctrl = TextEditingController(text: '$currentQty');
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(item.name),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Quantity'),
+          onSubmitted: (_) {
+            final v = int.tryParse(ctrl.text.trim());
+            if (v != null && v > 0) {
+              ref.read(cartProvider.notifier).setQuantity(item.id!, v);
+            }
+            Navigator.pop(ctx);
+          },
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              final v = int.tryParse(ctrl.text.trim());
+              if (v != null && v > 0) {
+                ref.read(cartProvider.notifier).setQuantity(item.id!, v);
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Set'),
           ),
         ],
       ),

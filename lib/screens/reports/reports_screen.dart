@@ -238,7 +238,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                         const SizedBox(height: 16),
                       ],
                       if (_byType.isNotEmpty) ...[
-                        _SectionHeader(title: 'Orders by Type'),
+                        _SectionHeader(title: 'Revenue by Type'),
                         const SizedBox(height: 8),
                         _TypePieChart(data: _byType),
                       ],
@@ -278,7 +278,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                         const SizedBox(height: 16),
                         _SectionHeader(
                           title: 'Peak Hours',
-                          subtitle: 'Orders & customers by hour',
+                          subtitle: 'Customers by hour',
                         ),
                         const SizedBox(height: 8),
                         _PeakHoursCard(data: _hourly),
@@ -657,12 +657,15 @@ class _SectionHeader extends StatelessWidget {
         ),
         if (subtitle != null) ...[
           const SizedBox(width: 8),
-          Text(
-            subtitle!,
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: AppColors.textSecondary),
+          Expanded(
+            child: Text(
+              subtitle!,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: AppColors.textSecondary),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ],
@@ -1467,9 +1470,7 @@ class _PeakHoursCard extends StatelessWidget {
                 SizedBox(width: 8),
                 Expanded(child: SizedBox()),
                 SizedBox(width: 8),
-                SizedBox(width: 40, child: Text('Orders', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary))),
-                SizedBox(width: 8),
-                SizedBox(width: 44, child: Text('Customers', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary))),
+                SizedBox(width: 52, child: Text('Customers', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary))),
               ],
             ),
           ),
@@ -1511,25 +1512,13 @@ class _PeakHoursCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   SizedBox(
-                    width: 40,
+                    width: 52,
                     child: Text(
                       '$orders',
                       textAlign: TextAlign.right,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: isPeak ? FontWeight.w700 : FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 44,
-                    child: Text(
-                      '$customers',
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
                       ),
                     ),
                   ),

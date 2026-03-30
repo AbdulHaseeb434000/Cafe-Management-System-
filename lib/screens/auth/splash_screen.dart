@@ -43,7 +43,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         return;
       }
 
-      // Store trial days for the expiry banner in MainScaffold
+      // Cache restaurant and trial days for settings/scaffold
+      ref.read(restaurantProvider.notifier).state = restaurant;
       ref.read(trialDaysProvider.notifier).state =
           SupabaseService.trialDaysLeft(restaurant);
 

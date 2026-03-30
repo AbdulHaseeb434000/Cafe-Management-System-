@@ -40,7 +40,7 @@ class PdfReceiptService {
   /// Returns a PdfPageFormat whose height exactly fits [contentPts] of content,
   /// plus a small safety buffer to avoid any edge clipping.
   static PdfPageFormat _fmt(double contentPts) {
-    final height = (contentPts * 1.08).clamp(80.0, 2000.0); // 8 % buffer
+    final height = (contentPts * 1.12).clamp(80.0, 2000.0); // 12 % buffer
     return PdfPageFormat(_w, height,
         marginLeft: _margin,
         marginRight: _margin,

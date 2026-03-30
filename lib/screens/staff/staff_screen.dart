@@ -14,10 +14,12 @@ class _StaffScreenState extends State<StaffScreen> {
   List<Map<String, dynamic>> _staff = [];
   bool _loading = true;
   String? _error;
+  String? _currentAuthUserId;
 
   @override
   void initState() {
     super.initState();
+    _currentAuthUserId = SupabaseService.currentUser?.id;
     _load();
   }
 
@@ -32,6 +34,27 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   Future<void> _showAddDialog() async {
+    // Billing warning confirmation
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Staff Member'),
+        content: const Text(
+          'Adding a staff member gives them access to this restaurant and counts as an additional seat. '
+          'This may affect your billing at the next cycle.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Continue')),
+        ],
+      ),
+    );
+    if (proceed != true) return;
+
     final nameCtrl = TextEditingController();
     String role = 'waiter';
 
@@ -233,6 +256,7 @@ class _StaffScreenState extends State<StaffScreen> {
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (_, i) => _StaffTile(
                 member: _staff[i],
+                isCurrentUser: _staff[i]['auth_user_id'] == _currentAuthUserId,
                 onDeactivate: () => _confirmDeactivate(_staff[i]),
               ),
             ),
@@ -275,9 +299,14 @@ class _SyncNoticeBanner extends StatelessWidget {
 }
 
 class _StaffTile extends StatelessWidget {
-  const _StaffTile({required this.member, required this.onDeactivate});
+  const _StaffTile({
+    required this.member,
+    required this.isCurrentUser,
+    required this.onDeactivate,
+  });
 
   final Map<String, dynamic> member;
+  final bool isCurrentUser;
   final VoidCallback onDeactivate;
 
   @override
@@ -288,6 +317,22 @@ class _StaffTile extends StatelessWidget {
     final isPending = member['auth_user_id'] == null;
     final inviteCode = member['invite_code'] as String?;
 
+    Widget? trailing;
+    if (isCurrentUser) {
+      trailing = Tooltip(
+        message: 'Cannot remove yourself',
+        child: const Icon(Icons.lock_outline, color: Colors.grey),
+      );
+    } else if (isActive) {
+      trailing = IconButton(
+        icon: const Icon(Icons.person_off_outlined),
+        tooltip: 'Deactivate',
+        onPressed: onDeactivate,
+      );
+    } else {
+      trailing = const Icon(Icons.block, color: Colors.grey);
+    }
+
     return Card(
       child: ListTile(
         leading: CircleAvatar(child: Text(name[0].toUpperCase())),
@@ -297,13 +342,7 @@ class _StaffTile extends StatelessWidget {
               ? 'Pending · Code: ${inviteCode ?? '—'}'
               : '${_label(role)} · ${isActive ? 'Active' : 'Inactive'}',
         ),
-        trailing: isActive
-            ? IconButton(
-                icon: const Icon(Icons.person_off_outlined),
-                tooltip: 'Deactivate',
-                onPressed: onDeactivate,
-              )
-            : const Icon(Icons.block, color: Colors.grey),
+        trailing: trailing,
       ),
     );
   }

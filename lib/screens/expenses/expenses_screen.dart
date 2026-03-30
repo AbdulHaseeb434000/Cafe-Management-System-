@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../models/expense_model.dart';
 import '../../providers/repository_providers.dart';
+import '../../repositories/activity_log_repository.dart';
 import '../../widgets/confirm_dialog.dart';
 
 final _expensesProvider =
@@ -205,17 +206,18 @@ class _ExpenseTile extends ConsumerWidget {
           ),
           child: Icon(_categoryIcon(expense.category), color: color, size: 20),
         ),
-        title: Text(
-          expense.description.isNotEmpty ? expense.description : expense.category,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        ),
-        subtitle: Text(
-          '${expense.category} · ${dateFmt.format(expense.date)}',
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
+        title: Row(
           children: [
+            Expanded(
+              child: Text(
+                expense.description.isNotEmpty
+                    ? expense.description
+                    : expense.category,
+                style:
+                    const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             Text(
               CurrencyFormatter.format(expense.amount),
               style: const TextStyle(
@@ -223,17 +225,21 @@ class _ExpenseTile extends ConsumerWidget {
                   fontSize: 14,
                   color: AppColors.error),
             ),
-            const SizedBox(width: 4),
-            PopupMenuButton<String>(
-              onSelected: (v) => _handleAction(context, ref, v),
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete',
-                        style: TextStyle(color: AppColors.error))),
-              ],
-            ),
+          ],
+        ),
+        subtitle: Text(
+          '${expense.category} · ${dateFmt.format(expense.date)}',
+          style:
+              const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+        ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (v) => _handleAction(context, ref, v),
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'edit', child: Text('Edit')),
+            const PopupMenuItem(
+                value: 'delete',
+                child: Text('Delete',
+                    style: TextStyle(color: AppColors.error))),
           ],
         ),
       ),
@@ -257,6 +263,15 @@ class _ExpenseTile extends ConsumerWidget {
           destructive: true);
       if (!ok) return;
       await ref.read(expenseRepositoryProvider).delete(expense.id!);
+      final label = expense.description.isNotEmpty
+          ? expense.description
+          : expense.category;
+      ActivityLogRepository.instance.log(
+        actionType: 'expense_deleted',
+        entityType: 'expense',
+        entityName: label,
+        details: '${expense.category} · ${expense.amount.toStringAsFixed(2)}',
+      );
       onChanged();
     }
   }
@@ -311,21 +326,35 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     if (!_formKey.currentState!.validate()) return;
     final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
     final repo = ref.read(expenseRepositoryProvider);
+    final desc = _descCtrl.text.trim();
+    final label = desc.isNotEmpty ? desc : _category;
 
     if (widget.expense == null) {
       await repo.insert(ExpenseModel.create(
         category: _category,
         amount: amount,
-        description: _descCtrl.text.trim(),
+        description: desc,
         date: _date,
       ));
+      ActivityLogRepository.instance.log(
+        actionType: 'expense_created',
+        entityType: 'expense',
+        entityName: label,
+        details: '$_category · ${amount.toStringAsFixed(2)}',
+      );
     } else {
       await repo.update(widget.expense!.copyWith(
         category: _category,
         amount: amount,
-        description: _descCtrl.text.trim(),
+        description: desc,
         date: _date,
       ));
+      ActivityLogRepository.instance.log(
+        actionType: 'expense_updated',
+        entityType: 'expense',
+        entityName: label,
+        details: '$_category · ${amount.toStringAsFixed(2)}',
+      );
     }
     widget.onSaved();
     if (mounted) Navigator.of(context).pop();

@@ -335,6 +335,9 @@ class _KitchenCard extends ConsumerWidget {
     final pdfBytes =
         await PdfReceiptService.instance.buildKitchenTicket(order);
     if (!context.mounted) return;
+    // Lock the order to signal kitchen is preparing
+    await ref.read(orderRepositoryProvider).setLocked(order.id!, locked: true);
+    ref.read(activeOrdersProvider.notifier).load();
     await Navigator.push<void>(
       context,
       MaterialPageRoute(

@@ -166,6 +166,14 @@ class CartNotifier extends StateNotifier<CartState> {
     state = state.copyWith(items: items);
   }
 
+  void setQuantity(int menuItemId, int quantity) {
+    if (quantity <= 0) return;
+    final items = List<CartItem>.from(state.items);
+    final idx = items.indexWhere((e) => e.menuItem.id == menuItemId);
+    if (idx >= 0) items[idx] = items[idx].copyWith(quantity: quantity);
+    state = state.copyWith(items: items);
+  }
+
   void setItemNote(int menuItemId, String note) {
     final items = List<CartItem>.from(state.items);
     final idx = items.indexWhere((e) => e.menuItem.id == menuItemId);

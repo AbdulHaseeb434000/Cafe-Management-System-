@@ -65,6 +65,12 @@ class DatabaseHelper {
         );
       }
     }
+    if (oldVersion < 5) {
+      // Add is_locked flag to orders for kitchen ticket lock feature
+      await db.execute(
+        'ALTER TABLE orders ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0',
+      );
+    }
   }
 
   Future<void> _seedDefaultSettings(Database db) async {
@@ -158,6 +164,7 @@ class DatabaseHelper {
       note             TEXT,
       created_at       TEXT    NOT NULL,
       completed_at     TEXT,
+      is_locked        INTEGER NOT NULL DEFAULT 0,
       sync_pending     INTEGER NOT NULL DEFAULT 1,
       FOREIGN KEY (table_id)    REFERENCES cafe_tables (id),
       FOREIGN KEY (customer_id) REFERENCES customers   (id)

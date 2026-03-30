@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/constants/app_constants.dart';
 import '../../providers/auth_providers.dart';
+import '../../providers/settings_providers.dart';
 import '../../services/supabase/supabase_service.dart';
 import '../../core/theme/app_colors.dart';
 import 'auth_widgets.dart';
@@ -80,7 +82,54 @@ class _SignupFormState extends ConsumerState<SignupForm> {
     ref.read(staffRoleProvider.notifier).state = 'owner';
 
     if (!mounted) return;
+    await _showCurrencyDialog();
+    if (!mounted) return;
     await _showTrialDialog();
+  }
+
+  Future<void> _showCurrencyDialog() async {
+    final ctrl = TextEditingController(text: AppConstants.defaultCurrencySymbol);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Currency Symbol'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'What currency symbol does your café use?',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Symbol (e.g. Rs., \$, £, €)',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Skip')),
+          FilledButton(
+            onPressed: () async {
+              final symbol = ctrl.text.trim();
+              if (symbol.isNotEmpty) {
+                await ref.read(settingsNotifierProvider.notifier).set(
+                      AppConstants.settingCurrencySymbol,
+                      symbol,
+                    );
+              }
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _joinWithCode() async {

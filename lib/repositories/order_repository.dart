@@ -25,7 +25,13 @@ class OrderRepository {
       WHERE o.status NOT IN ('completed', 'cancelled')
       ORDER BY o.created_at DESC
     ''');
-    return rows.map(OrderModel.fromMap).toList();
+    final orders = <OrderModel>[];
+    for (final row in rows) {
+      final order = OrderModel.fromMap(row);
+      final items = await getItems(order.id!);
+      orders.add(order.copyWith(items: items));
+    }
+    return orders;
   }
 
   Future<List<OrderModel>> getHistory({
@@ -143,6 +149,15 @@ class OrderRepository {
   }
 
   Future<void> cancel(int id) => updateStatus(id, AppConstants.orderStatusCancelled);
+
+  Future<void> setLocked(int id, {required bool locked}) async {
+    await _db.update(
+      _ordersTable,
+      {'is_locked': locked ? 1 : 0},
+      'id = ?',
+      [id],
+    );
+  }
 
   String _typeLabel(String type) {
     return switch (type) {

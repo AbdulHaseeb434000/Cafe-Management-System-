@@ -152,6 +152,11 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
         return;
       }
 
+      // Cache restaurant for settings screen
+      ref.read(restaurantProvider.notifier).state = restaurant;
+      ref.read(trialDaysProvider.notifier).state =
+          SupabaseService.trialDaysLeft(restaurant);
+
       final staff = await SupabaseService.fetchStaffRecord();
       if (!mounted) return;
 
@@ -323,6 +328,18 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
                     )
                   : const Text('Login', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             ),
+            if (SupabaseService.isSignedIn) ...[
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: () async {
+                    await SupabaseService.signOut();
+                    setState(() {});
+                  },
+                  child: const Text('Sign out of current account'),
+                ),
+              ),
+            ],
           ],
         ),
       ),

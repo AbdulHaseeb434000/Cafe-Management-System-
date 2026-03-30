@@ -30,7 +30,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final settingsAsync = ref.watch(settingsNotifierProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        title: const Text('Settings'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh plan status',
+            onPressed: () async {
+              final restaurant = await SupabaseService.fetchRestaurant();
+              if (!mounted) return;
+              ref.read(restaurantProvider.notifier).state = restaurant;
+              ref.read(trialDaysProvider.notifier).state =
+                  SupabaseService.trialDaysLeft(restaurant);
+            },
+          ),
+        ],
+      ),
       body: settingsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
@@ -78,8 +93,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
 
-            const SectionHeader(title: 'Billing'),
+            const SectionHeader(title: 'Plan'),
             const _PlanStatusTile(),
+
+            const SectionHeader(title: 'Billing'),
             _SettingsTile(
               icon: Icons.percent_outlined,
               label: 'Tax Rate',
@@ -341,38 +358,16 @@ class _LogoTile extends ConsumerWidget {
 
 // ── Plan Status Tile ──────────────────────────────────────────────────────────
 
-class _PlanStatusTile extends StatefulWidget {
+class _PlanStatusTile extends ConsumerWidget {
   const _PlanStatusTile();
 
   @override
-  State<_PlanStatusTile> createState() => _PlanStatusTileState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final restaurant = ref.watch(restaurantProvider);
+    if (restaurant == null) return const SizedBox.shrink();
 
-class _PlanStatusTileState extends State<_PlanStatusTile> {
-  Map<String, dynamic>? _restaurant;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    SupabaseService.fetchRestaurant().then((r) {
-      if (mounted) setState(() { _restaurant = r; _loading = false; });
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      return const ListTile(
-        leading: Icon(Icons.star_outline, size: 22, color: AppColors.textSecondary),
-        title: Text('Plan'),
-        subtitle: Text('Loading…'),
-      );
-    }
-    if (_restaurant == null) return const SizedBox.shrink();
-
-    final plan = _restaurant!['plan'] as String? ?? 'trial';
-    final days = SupabaseService.trialDaysLeft(_restaurant!);
+    final plan = restaurant['plan'] as String? ?? 'trial';
+    final days = SupabaseService.trialDaysLeft(restaurant);
     final isPaid = plan != 'trial' && plan != 'suspended';
 
     String subtitle;
@@ -381,7 +376,9 @@ class _PlanStatusTileState extends State<_PlanStatusTile> {
       subtitle = 'Suspended — contact support';
       subtitleColor = Colors.red;
     } else if (days != null) {
-      subtitle = days <= 0 ? 'Trial ended — upgrade to continue' : '$days day${days == 1 ? '' : 's'} left in trial';
+      subtitle = days <= 0
+          ? 'Trial ended — upgrade to continue'
+          : '$days day${days == 1 ? '' : 's'} left in trial';
       subtitleColor = days <= 1 ? Colors.red : AppColors.textSecondary;
     } else {
       subtitle = 'Active';

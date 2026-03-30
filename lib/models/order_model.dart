@@ -23,6 +23,7 @@ class OrderModel {
   final String? note;
   final DateTime createdAt;
   final DateTime? completedAt;
+  final bool isLocked;
 
   // Eagerly loaded (not in DB columns)
   final List<OrderItemModel> items;
@@ -52,6 +53,7 @@ class OrderModel {
     this.note,
     required this.createdAt,
     this.completedAt,
+    this.isLocked = false,
     this.items = const [],
     this.tableName,
     this.customerName,
@@ -96,6 +98,7 @@ class OrderModel {
     String? note,
     DateTime? createdAt,
     DateTime? completedAt,
+    bool? isLocked,
     List<OrderItemModel>? items,
     String? tableName,
     String? customerName,
@@ -121,6 +124,7 @@ class OrderModel {
       note: note ?? this.note,
       createdAt: createdAt ?? this.createdAt,
       completedAt: completedAt ?? this.completedAt,
+      isLocked: isLocked ?? this.isLocked,
       items: items ?? this.items,
       tableName: tableName ?? this.tableName,
       customerName: customerName ?? this.customerName,
@@ -148,6 +152,7 @@ class OrderModel {
         'note': note,
         'created_at': DateHelpers.toIso(createdAt),
         'completed_at': completedAt != null ? DateHelpers.toIso(completedAt!) : null,
+        'is_locked': isLocked ? 1 : 0,
       };
 
   factory OrderModel.fromMap(Map<String, dynamic> map) => OrderModel(
@@ -172,6 +177,7 @@ class OrderModel {
         completedAt: map['completed_at'] != null
             ? DateHelpers.fromIso(map['completed_at'] as String)
             : null,
+        isLocked: (map['is_locked'] as int? ?? 0) == 1,
         tableName: map['table_name'] as String?,
         customerName: map['customer_name'] as String?,
         itemCount: (map['item_count'] as num?)?.toInt(),
