@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 /// Central access point for Supabase.
 /// Call [SupabaseService.initialize] once in main() before runApp.
@@ -116,24 +117,25 @@ class SupabaseService {
 
     final trialEnd = DateTime.now().add(const Duration(days: 3)).toUtc();
 
-    // Insert restaurant
-    final restaurant = await client
-        .from('restaurants')
-        .insert({
-          'name': restaurantName,
-          'owner_email': user.email,
-          'address': address ?? '',
-          'phone': phone ?? '',
-          'plan': 'trial',
-          'trial_end_date': trialEnd.toIso8601String(),
-          'max_devices': 1,
-        })
-        .select()
-        .single();
+    // Generate restaurant UUID on the client so we never need to SELECT the
+    // inserted row — the SELECT policy fails at this point because the staff
+    // row doesn't exist yet (chicken-and-egg with current_restaurant_id()).
+    final restaurantId = const Uuid().v4();
+
+    await client.from('restaurants').insert({
+      'id': restaurantId,
+      'name': restaurantName,
+      'owner_email': user.email,
+      'address': address ?? '',
+      'phone': phone ?? '',
+      'plan': 'trial',
+      'trial_end_date': trialEnd.toIso8601String(),
+      'max_devices': 1,
+    });
 
     // Insert owner staff record
     await client.from('staff').insert({
-      'restaurant_id': restaurant['id'],
+      'restaurant_id': restaurantId,
       'auth_user_id': user.id,
       'name': ownerName,
       'role': 'owner',
