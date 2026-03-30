@@ -93,8 +93,7 @@ class SyncService {
           await db.update(
             table,
             {'sync_pending': 0},
-            'sync_pending = 1',
-            [],
+            where: 'sync_pending = 1',
           );
         } catch (_) {
           // Per-table failure is non-fatal; try remaining tables
