@@ -4,7 +4,7 @@ class AppConstants {
   static const String appName = 'PlatoDesk';
   static const String appVersion = '1.0.0';
   static const String dbName = 'platodesk.db';
-  static const int dbVersion = 3;
+  static const int dbVersion = 4;
 
   // Settings keys
   static const String settingCafeName = 'cafe_name';

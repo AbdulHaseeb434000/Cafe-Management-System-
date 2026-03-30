@@ -6,11 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'repositories/activity_log_repository.dart';
 import 'services/supabase/supabase_service.dart';
+import 'services/sync/sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await SupabaseService.initialize();
+
+  // Start cloud sync (push pending rows + initial pull on new device)
+  SyncService.instance.start();
 
   // Keep activity log tidy — purge entries older than 90 days
   unawaited(ActivityLogRepository.instance.purgeOlderThan(90));

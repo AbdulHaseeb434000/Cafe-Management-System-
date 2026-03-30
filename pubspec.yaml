@@ -47,6 +47,9 @@ dependencies:
   share_plus: ^12.0.1
   file_picker: ^8.1.2
 
+  # Connectivity detection (sync trigger)
+  connectivity_plus: ^6.0.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

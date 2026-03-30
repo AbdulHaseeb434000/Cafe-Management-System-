@@ -43,12 +43,27 @@ class DatabaseHelper {
     await _seedDefaultSettings(db);
   }
 
+  // Tables that participate in cloud sync (have sync_pending column).
+  static const syncTables = {
+    'categories', 'menu_items', 'cafe_tables', 'customers',
+    'orders', 'order_items', 'payments',
+    'inventory_items', 'inventory_logs', 'expenses',
+  };
+
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute(_createActivityLogs);
     }
     if (oldVersion < 3) {
       await db.execute(_createExpenses);
+    }
+    if (oldVersion < 4) {
+      // Add sync_pending flag to all cloud-sync tables
+      for (final table in syncTables) {
+        await db.execute(
+          'ALTER TABLE $table ADD COLUMN sync_pending INTEGER NOT NULL DEFAULT 1',
+        );
+      }
     }
   }
 
@@ -72,12 +87,13 @@ class DatabaseHelper {
 
   static const _createCategories = '''
     CREATE TABLE categories (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      uuid       TEXT    NOT NULL UNIQUE,
-      name       TEXT    NOT NULL,
-      icon       TEXT    NOT NULL DEFAULT 'restaurant',
-      sort_order INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT    NOT NULL
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid         TEXT    NOT NULL UNIQUE,
+      name         TEXT    NOT NULL,
+      icon         TEXT    NOT NULL DEFAULT 'restaurant',
+      sort_order   INTEGER NOT NULL DEFAULT 0,
+      created_at   TEXT    NOT NULL,
+      sync_pending INTEGER NOT NULL DEFAULT 1
     )
   ''';
 
@@ -93,28 +109,31 @@ class DatabaseHelper {
       is_available  INTEGER NOT NULL DEFAULT 1,
       image_path    TEXT,
       created_at    TEXT    NOT NULL,
+      sync_pending  INTEGER NOT NULL DEFAULT 1,
       FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
     )
   ''';
 
   static const _createTables = '''
     CREATE TABLE cafe_tables (
-      id       INTEGER PRIMARY KEY AUTOINCREMENT,
-      uuid     TEXT    NOT NULL UNIQUE,
-      name     TEXT    NOT NULL,
-      capacity INTEGER NOT NULL DEFAULT 4,
-      status   TEXT    NOT NULL DEFAULT 'free'
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid         TEXT    NOT NULL UNIQUE,
+      name         TEXT    NOT NULL,
+      capacity     INTEGER NOT NULL DEFAULT 4,
+      status       TEXT    NOT NULL DEFAULT 'free',
+      sync_pending INTEGER NOT NULL DEFAULT 1
     )
   ''';
 
   static const _createCustomers = '''
     CREATE TABLE customers (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      uuid       TEXT NOT NULL UNIQUE,
-      name       TEXT NOT NULL,
-      phone      TEXT,
-      address    TEXT,
-      created_at TEXT NOT NULL
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid         TEXT NOT NULL UNIQUE,
+      name         TEXT NOT NULL,
+      phone        TEXT,
+      address      TEXT,
+      created_at   TEXT NOT NULL,
+      sync_pending INTEGER NOT NULL DEFAULT 1
     )
   ''';
 
@@ -139,6 +158,7 @@ class DatabaseHelper {
       note             TEXT,
       created_at       TEXT    NOT NULL,
       completed_at     TEXT,
+      sync_pending     INTEGER NOT NULL DEFAULT 1,
       FOREIGN KEY (table_id)    REFERENCES cafe_tables (id),
       FOREIGN KEY (customer_id) REFERENCES customers   (id)
     )
@@ -156,6 +176,7 @@ class DatabaseHelper {
       price_snapshot REAL    NOT NULL,
       quantity       INTEGER NOT NULL DEFAULT 1,
       note           TEXT,
+      sync_pending   INTEGER NOT NULL DEFAULT 1,
       FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE
     )
   ''';
@@ -170,6 +191,7 @@ class DatabaseHelper {
       amount_tendered REAL    NOT NULL,
       change_amount   REAL    NOT NULL DEFAULT 0,
       paid_at         TEXT    NOT NULL,
+      sync_pending    INTEGER NOT NULL DEFAULT 1,
       FOREIGN KEY (order_id) REFERENCES orders (id)
     )
   ''';
@@ -182,7 +204,8 @@ class DatabaseHelper {
       unit                TEXT NOT NULL,
       quantity            REAL NOT NULL DEFAULT 0,
       low_stock_threshold REAL NOT NULL DEFAULT 0,
-      updated_at          TEXT NOT NULL
+      updated_at          TEXT NOT NULL,
+      sync_pending        INTEGER NOT NULL DEFAULT 1
     )
   ''';
 
@@ -195,6 +218,7 @@ class DatabaseHelper {
       change_amount       REAL    NOT NULL,
       reason              TEXT,
       created_at          TEXT    NOT NULL,
+      sync_pending        INTEGER NOT NULL DEFAULT 1,
       FOREIGN KEY (inventory_item_id) REFERENCES inventory_items (id) ON DELETE CASCADE
     )
   ''';
@@ -208,13 +232,14 @@ class DatabaseHelper {
 
   static const _createExpenses = '''
     CREATE TABLE expenses (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      uuid        TEXT    NOT NULL UNIQUE,
-      category    TEXT    NOT NULL DEFAULT 'other',
-      amount      REAL    NOT NULL,
-      description TEXT    NOT NULL DEFAULT '',
-      date        TEXT    NOT NULL,
-      created_at  TEXT    NOT NULL
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid         TEXT    NOT NULL UNIQUE,
+      category     TEXT    NOT NULL DEFAULT 'other',
+      amount       REAL    NOT NULL,
+      description  TEXT    NOT NULL DEFAULT '',
+      date         TEXT    NOT NULL,
+      created_at   TEXT    NOT NULL,
+      sync_pending INTEGER NOT NULL DEFAULT 1
     )
   ''';
 
@@ -245,7 +270,12 @@ class DatabaseHelper {
     List<dynamic> whereArgs,
   ) async {
     final db = await database;
-    return db.update(table, data, where: where, whereArgs: whereArgs);
+    // Mark rows as sync-pending when updated, unless the caller manages it
+    final payload = Map<String, dynamic>.from(data);
+    if (syncTables.contains(table) && !payload.containsKey('sync_pending')) {
+      payload['sync_pending'] = 1;
+    }
+    return db.update(table, payload, where: where, whereArgs: whereArgs);
   }
 
   Future<int> delete(String table, String where, List<dynamic> whereArgs) async {
