@@ -139,7 +139,11 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
       if (!mounted) return;
 
       if (restaurant == null) {
-        setState(() { _error = 'Account setup incomplete. Contact support.'; _loading = false; });
+        // Auth user exists but restaurant/staff rows were never created
+        // (signup was interrupted). Let the user complete setup now.
+        setState(() { _loading = false; });
+        if (!mounted) return;
+        await _showCompleteSetupDialog();
         return;
       }
 
@@ -164,6 +168,85 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
     } catch (_) {
       setState(() { _error = 'Something went wrong. Check your connection.'; _loading = false; });
     }
+  }
+
+  Future<void> _showCompleteSetupDialog() async {
+    final restaurantCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    String? dialogError;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          title: const Text('Complete Your Setup'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Your account was created but setup didn\'t finish. '
+                  'Enter your details to complete it.',
+                  style: TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                if (dialogError != null) ...[
+                  Text(dialogError!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12)),
+                  const SizedBox(height: 8),
+                ],
+                TextFormField(
+                  controller: restaurantCtrl,
+                  decoration: const InputDecoration(labelText: 'Restaurant / Café Name'),
+                  textCapitalization: TextCapitalization.words,
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Required' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Your Name'),
+                  textCapitalization: TextCapitalization.words,
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Required' : null,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                SupabaseService.signOut();
+                Navigator.pop(ctx);
+              },
+              child: const Text('Sign Out'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                try {
+                  await SupabaseService.createRestaurant(
+                    restaurantName: restaurantCtrl.text.trim(),
+                    ownerName: nameCtrl.text.trim(),
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (mounted) {
+                    ref.read(staffRoleProvider.notifier).state = 'owner';
+                    context.go('/');
+                  }
+                } catch (e) {
+                  setInner(() => dialogError = e.toString());
+                }
+              },
+              child: const Text('Complete Setup'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _forgotPassword() async {
