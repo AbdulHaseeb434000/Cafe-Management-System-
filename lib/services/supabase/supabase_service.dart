@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Central access point for Supabase.
@@ -137,6 +139,52 @@ class SupabaseService {
       'role': 'owner',
       'is_active': true,
     });
+  }
+
+  // ── Staff management ────────────────────────────────────────────────────
+
+  /// List all staff for the current user's restaurant.
+  static Future<List<Map<String, dynamic>>> listStaff() async {
+    final staff = await fetchStaffRecord();
+    if (staff == null) return [];
+    final rows = await client
+        .from('staff')
+        .select()
+        .eq('restaurant_id', staff['restaurant_id'] as String)
+        .order('added_at', ascending: true);
+    return List<Map<String, dynamic>>.from(rows as List);
+  }
+
+  /// Add a pending staff member and return the generated invite code.
+  static Future<String> addPendingStaff({
+    required String name,
+    required String role,
+  }) async {
+    final staff = await fetchStaffRecord();
+    if (staff == null) throw Exception('Not signed in');
+    final code = _generateInviteCode();
+    await client.from('staff').insert({
+      'restaurant_id': staff['restaurant_id'],
+      'name': name,
+      'role': role,
+      'invite_code': code,
+      'is_active': true,
+    });
+    return code;
+  }
+
+  /// Deactivate a staff member (soft-delete).
+  static Future<void> deactivateStaff(String staffId) async {
+    await client
+        .from('staff')
+        .update({'is_active': false})
+        .eq('id', staffId);
+  }
+
+  static String _generateInviteCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final rand = Random.secure();
+    return List.generate(6, (_) => chars[rand.nextInt(chars.length)]).join();
   }
 
   // ── Subscription / plan helpers ──────────────────────────────────────────

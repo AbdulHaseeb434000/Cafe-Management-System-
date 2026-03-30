@@ -16,6 +16,7 @@ import '../../screens/reports/reports_screen.dart';
 import '../../screens/settings/settings_screen.dart';
 import '../../screens/activity_log/activity_log_screen.dart';
 import '../../screens/expenses/expenses_screen.dart';
+import '../../screens/staff/staff_screen.dart';
 import '../../widgets/main_scaffold.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -132,6 +133,11 @@ final appRouter = GoRouter(
           path: '/expenses',
           pageBuilder: (c, s) =>
               const NoTransitionPage(child: ExpensesScreen()),
+        ),
+        GoRoute(
+          path: '/staff',
+          pageBuilder: (c, s) =>
+              const NoTransitionPage(child: StaffScreen()),
         ),
       ],
     ),

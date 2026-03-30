@@ -28,6 +28,7 @@ create table restaurants (
 -- ─────────────────────────────────────────────────────────────────────────────
 create table staff (
   id              uuid primary key default uuid_generate_v4(),
+  invite_code     text unique,
   restaurant_id   uuid not null references restaurants(id) on delete cascade,
   auth_user_id    uuid not null references auth.users(id) on delete cascade,
   name            text not null,

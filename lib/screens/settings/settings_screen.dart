@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/constants/app_constants.dart';
@@ -11,6 +12,7 @@ import '../../providers/settings_providers.dart';
 import '../../providers/table_providers.dart';
 import '../../services/backup/backup_service.dart';
 import '../../core/database/database_helper.dart';
+import '../../providers/auth_providers.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/section_header.dart';
 
@@ -134,6 +136,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             const SectionHeader(title: 'Tables'),
             _TableManagementTile(),
+
+            // Staff management — owner & manager only
+            if (() {
+              final role = ref.watch(staffRoleProvider);
+              return role == 'owner' || role == 'manager';
+            }()) ...[
+              const SectionHeader(title: 'Team'),
+              ListTile(
+                leading: const Icon(Icons.people_outline,
+                    size: 22, color: AppColors.textSecondary),
+                title: const Text('Manage Staff'),
+                subtitle: const Text('Add, view, or deactivate team members'),
+                trailing: const Icon(Icons.chevron_right,
+                    size: 18, color: AppColors.textSecondary),
+                onTap: () => context.go('/staff'),
+              ),
+            ],
 
             const SectionHeader(title: 'Backup & Restore'),
             _BackupRestoreSection(),
