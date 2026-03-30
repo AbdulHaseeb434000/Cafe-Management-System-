@@ -112,7 +112,8 @@ create table if not exists orders (
   total           numeric(10,2) not null default 0,
   note            text,
   created_at      timestamptz not null default now(),
-  completed_at    timestamptz
+  completed_at    timestamptz,
+  is_locked       boolean not null default false
 );
 
 create table if not exists order_items (
@@ -222,6 +223,17 @@ do $$ begin
 exception when others then null; -- ignore if already nullable
 end $$;
 
+do $$ begin
+  -- orders.is_locked (added in SQLite db v5 — must match here so sync push succeeds)
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'orders' and column_name = 'is_locked'
+  ) then
+    alter table orders add column is_locked boolean not null default false;
+  end if;
+exception when others then null;
+end $$;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Row Level Security (RLS)
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -258,6 +270,38 @@ as $$
   where auth_user_id = auth.uid()
     and is_active = true
   limit 1;
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- claim_invite_code RPC
+-- Atomically validates and claims an invite code for a newly signed-up user.
+-- SECURITY DEFINER so it can read/update staff rows without open RLS policies.
+-- Returns the claimed staff row on success; raises an exception on failure.
+-- ─────────────────────────────────────────────────────────────────────────────
+create or replace function claim_invite_code(p_code text)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_row staff%rowtype;
+begin
+  -- Atomically claim: only succeeds if code exists AND is not yet linked
+  update staff
+  set auth_user_id = auth.uid(),
+      invite_code  = null
+  where upper(invite_code) = upper(p_code)
+    and auth_user_id is null
+  returning * into v_row;
+
+  if not found then
+    raise exception 'invalid_or_used_code'
+      using hint = 'The invite code is invalid or has already been used.';
+  end if;
+
+  return row_to_json(v_row);
+end;
 $$;
 
 -- Drop existing policies before recreating (idempotent)
@@ -302,14 +346,10 @@ create policy "staff_all" on staff
 create policy "staff_insert_self" on staff
   for insert with check (auth_user_id = auth.uid());
 
--- Invite code join: allow reading any pending (unlinked) staff row by invite code
-create policy "staff_invite_select" on staff
-  for select using (invite_code is not null);
-
--- Invite code join: allow a newly-signed-up user to claim their pending invite row
-create policy "staff_claim_invite" on staff
-  for update using (invite_code is not null)
-  with check (auth_user_id = auth.uid());
+-- NOTE: The old "staff_invite_select" and "staff_claim_invite" open policies
+-- have been intentionally removed. Invite code lookup and claim are now handled
+-- exclusively through the claim_invite_code() SECURITY DEFINER RPC, which
+-- prevents cross-restaurant invite code enumeration.
 
 -- All app-data tables: scoped to current restaurant
 create policy "categories_all"      on categories      for all using (restaurant_id = current_restaurant_id());

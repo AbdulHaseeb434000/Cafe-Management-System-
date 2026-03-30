@@ -79,6 +79,12 @@ class SyncService {
           final pending = await db.query(table, where: 'sync_pending = 1');
           if (pending.isEmpty) continue;
 
+          // Capture the exact UUIDs we are about to push so that rows written
+          // to the DB between the SELECT and the mark-synced UPDATE are not
+          // incorrectly cleared (they would never reach Supabase otherwise).
+          final pushedUuids =
+              pending.map((row) => row['uuid'] as String).toList();
+
           final payload = pending.map((row) {
             return {
               ...Map<String, dynamic>.from(row)
@@ -92,11 +98,11 @@ class SyncService {
               .from(table)
               .upsert(payload, onConflict: 'uuid');
 
-          // Mark as synced directly (bypass auto-pending in DatabaseHelper.update)
-          await db.update(
-            table,
-            {'sync_pending': 0},
-            where: 'sync_pending = 1',
+          // Mark only the rows we just pushed as synced.
+          final placeholders = List.filled(pushedUuids.length, '?').join(', ');
+          await db.rawUpdate(
+            'UPDATE $table SET sync_pending = 0 WHERE uuid IN ($placeholders)',
+            pushedUuids,
           );
         } catch (_) {
           // Per-table failure is non-fatal; try remaining tables

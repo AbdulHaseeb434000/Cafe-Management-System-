@@ -64,19 +64,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       ref.read(trialDaysProvider.notifier).state =
           SupabaseService.trialDaysLeft(restaurant);
 
-      String role = 'owner';
+      String role = 'waiter'; // default to least-privileged until confirmed
       if (!fromCache) {
         // Fetch staff role from Supabase (only possible when online)
         final staff = await SupabaseService.fetchStaffRecord();
         if (!mounted) return;
-        role = staff?['role'] as String? ?? 'owner';
+        role = staff?['role'] as String? ?? 'waiter';
         await _cacheStaffRole(role);
       } else {
         // Offline — use cached role
-        role = await _loadCachedStaffRole() ?? 'owner';
+        role = await _loadCachedStaffRole() ?? 'waiter';
       }
 
+      // Update both the Riverpod provider (for UI) and the ValueNotifier
+      // bridge (for GoRouter redirect) in one place.
       ref.read(staffRoleProvider.notifier).state = role;
+      roleRouterNotifier.value = role;
       _routeByRole(role);
     } else {
       context.go('/login');

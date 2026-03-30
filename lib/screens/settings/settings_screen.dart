@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/supabase/supabase_service.dart';
+import '../../providers/auth_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/constants/app_constants.dart';
@@ -267,7 +268,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 );
                 if (ok == true && mounted) {
-                  await SupabaseService.signOut();
+                  await signOutAndClear(ref);
                   if (mounted) context.go('/login');
                 }
               },

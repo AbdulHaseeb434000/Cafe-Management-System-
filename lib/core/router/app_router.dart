@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/auth_providers.dart';
 import '../../screens/auth/splash_screen.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/paywall_screen.dart';
+// signup_screen.dart exports SignupForm which is embedded as a tab inside
+// LoginScreen — no separate /signup route is needed.
 import '../../screens/dashboard/dashboard_screen.dart';
 import '../../screens/menu/menu_screen.dart';
 import '../../screens/orders/orders_screen.dart';
@@ -24,9 +27,50 @@ final GlobalKey<NavigatorState> _rootNavigatorKey =
 final GlobalKey<NavigatorState> _shellNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'shell');
 
+/// Routes that each role is allowed to access.
+/// Any route not listed for a role redirects to /dashboard.
+const _ownerRoutes = {
+  '/dashboard', '/orders', '/menu', '/tables', '/kitchen',
+  '/inventory', '/reports', '/settings', '/activity-log',
+  '/expenses', '/staff',
+};
+const _managerRoutes = {
+  '/dashboard', '/orders', '/menu', '/tables', '/kitchen',
+  '/inventory', '/reports', '/settings', '/activity-log', '/expenses',
+};
+const _waiterRoutes = {'/dashboard', '/orders', '/tables', '/settings'};
+const _kitchenRoutes = {'/kitchen'};
+
+Set<String> _allowedRoutes(String role) => switch (role) {
+      'owner'   => _ownerRoutes,
+      'manager' => _managerRoutes,
+      'waiter'  => _waiterRoutes,
+      'kitchen' => _kitchenRoutes,
+      _         => _waiterRoutes, // default to most restrictive
+    };
+
+String? _roleRedirect(GoRouterState state) {
+  final path = state.matchedLocation;
+  // Skip auth/public routes
+  if (path == '/splash' || path == '/login' || path == '/signup' ||
+      path == '/paywall') return null;
+  // Full-screen transient routes: everyone who is logged in can reach these
+  if (path.startsWith('/orders/new') ||
+      path.startsWith('/orders/') ||
+      path.startsWith('/billing/')) return null;
+
+  final role = roleRouterNotifier.value;
+  final allowed = _allowedRoutes(role);
+  // Check if any allowed route is a prefix of the current path
+  final permitted = allowed.any((r) => path == r || path.startsWith('$r/'));
+  return permitted ? null : '/dashboard';
+}
+
 final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/splash',
+  refreshListenable: roleRouterNotifier,
+  redirect: (context, state) => _roleRedirect(state),
   routes: [
     // ── Auth / onboarding ────────────────────────────────────────────────
     GoRoute(
