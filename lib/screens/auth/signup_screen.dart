@@ -183,6 +183,37 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             ),
             const SizedBox(height: 20),
 
+            if (_joinMode) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.vpn_key_outlined,
+                        size: 16, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Your manager has already set up the restaurant on PlatoDesk '
+                        'and generated a 6-character invite code just for you. '
+                        'Enter it below to join their team.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.primary.withValues(alpha: 0.85),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             if (_error != null) ...[
               AuthErrorBanner(message: _error!),
               const SizedBox(height: 16),

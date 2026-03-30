@@ -152,6 +152,7 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
 
           Widget body = Column(
             children: [
+              const _RetentionBanner(),
               if (_from != null || _to != null) _FilterChip(
                 from: _from,
                 to: _to,
@@ -261,6 +262,38 @@ class _ActivityLogScreenState extends ConsumerState<ActivityLogScreen> {
 }
 
 // ── Filter chip bar ──────────────────────────────────────────────────────────
+
+class _RetentionBanner extends StatelessWidget {
+  const _RetentionBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline,
+              size: 16,
+              color: Theme.of(context).colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Activity log keeps the last 90 days. '
+              'For full order history, payments, and inventory records, '
+              'visit their respective screens.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _FilterChip extends StatelessWidget {
   final DateTime? from;
