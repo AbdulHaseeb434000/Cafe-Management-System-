@@ -243,10 +243,15 @@ alter table billing_events           enable row level security;
 alter table device_billing_snapshots enable row level security;
 
 -- Helper function: resolve restaurant_id for the signed-in user
+-- SECURITY DEFINER is critical — without it, the function queries the staff
+-- table which triggers its own RLS policy which calls this function again
+-- → infinite recursion → "stack depth limit exceeded" (code 54001).
 create or replace function current_restaurant_id()
 returns uuid
 language sql
 stable
+security definer                -- runs as function owner (postgres), bypasses RLS
+set search_path = public        -- prevent search_path injection
 as $$
   select restaurant_id
   from staff
@@ -262,6 +267,8 @@ do $$ begin
   drop policy if exists "restaurant_update"  on restaurants;
   drop policy if exists "staff_all"          on staff;
   drop policy if exists "staff_invite_select" on staff;
+  drop policy if exists "staff_insert_self"   on staff;
+  drop policy if exists "staff_claim_invite"  on staff;
   drop policy if exists "categories_all"     on categories;
   drop policy if exists "menu_items_all"     on menu_items;
   drop policy if exists "cafe_tables_all"    on cafe_tables;
@@ -287,14 +294,22 @@ create policy "restaurant_insert" on restaurants
 create policy "restaurant_update" on restaurants
   for update using (id = current_restaurant_id());
 
--- staff: existing members see their restaurant's staff
+-- staff: existing members can read/update/delete their restaurant's staff
 create policy "staff_all" on staff
   for all using (restaurant_id = current_restaurant_id());
 
--- Allow reading a pending staff row by invite_code during signup
--- (unauthenticated select needed so joinWithInviteCode can find the row)
+-- Owner signup: allow a user to insert their own staff row (no staff row exists yet)
+create policy "staff_insert_self" on staff
+  for insert with check (auth_user_id = auth.uid());
+
+-- Invite code join: allow reading any pending (unlinked) staff row by invite code
 create policy "staff_invite_select" on staff
   for select using (invite_code is not null);
+
+-- Invite code join: allow a newly-signed-up user to claim their pending invite row
+create policy "staff_claim_invite" on staff
+  for update using (invite_code is not null)
+  with check (auth_user_id = auth.uid());
 
 -- All app-data tables: scoped to current restaurant
 create policy "categories_all"      on categories      for all using (restaurant_id = current_restaurant_id());
