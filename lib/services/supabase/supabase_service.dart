@@ -155,6 +155,45 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(rows as List);
   }
 
+  /// Staff member joins an existing restaurant using an invite code.
+  /// Returns the staff row on success.
+  static Future<Map<String, dynamic>> joinWithInviteCode({
+    required String email,
+    required String password,
+    required String inviteCode,
+  }) async {
+    // 1. Find the pending staff row for this invite code
+    final pending = await client
+        .from('staff')
+        .select()
+        .eq('invite_code', inviteCode.trim().toUpperCase())
+        .maybeSingle();
+
+    if (pending == null) {
+      throw Exception('Invalid invite code. Please check with your manager.');
+    }
+    if (pending['auth_user_id'] != null) {
+      throw Exception('This invite code has already been used.');
+    }
+
+    // 2. Create the auth account
+    final response = await auth.signUp(email: email, password: password);
+    if (response.user == null) {
+      throw Exception('Signup failed. Please try again.');
+    }
+
+    // 3. Link the auth user to the pending staff row
+    await client
+        .from('staff')
+        .update({
+          'auth_user_id': response.user!.id,
+          'invite_code': null,
+        })
+        .eq('id', pending['id'] as String);
+
+    return Map<String, dynamic>.from(pending);
+  }
+
   /// Add a pending staff member and return the generated invite code.
   static Future<String> addPendingStaff({
     required String name,
