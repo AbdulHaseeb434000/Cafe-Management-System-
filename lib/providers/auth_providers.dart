@@ -2,6 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/supabase/supabase_service.dart';
 
+/// Cloud sync status shown in the app bar.
+enum SyncStatus { idle, syncing, error }
+
 /// Holds the current signed-in staff's role.
 /// Roles: 'owner' | 'manager' | 'waiter' | 'kitchen'
 ///
@@ -16,6 +19,12 @@ final trialDaysProvider = StateProvider<int?>((ref) => null);
 /// Cached restaurant row fetched on login/splash.
 /// Used by settings screen to avoid a network call every time it opens.
 final restaurantProvider = StateProvider<Map<String, dynamic>?>((ref) => null);
+
+/// Notifies the UI of the current cloud-sync state (idle / syncing / error).
+///
+/// Updated by [SyncService.push]. Watched in [MainScaffold] via
+/// [ValueListenableBuilder] to show a cloud icon in the app bar.
+final syncNotifier = ValueNotifier<SyncStatus>(SyncStatus.idle);
 
 /// A [ValueNotifier] that mirrors [staffRoleProvider] so that [GoRouter]
 /// (a non-Riverpod object) can react to role changes via [refreshListenable].

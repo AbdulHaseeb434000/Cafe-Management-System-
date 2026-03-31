@@ -61,11 +61,18 @@ class MainScaffold extends ConsumerWidget {
         ? _buildTabletLayout(context, bottomItems, extras)
         : _buildMobileLayout(context, bottomItems, extras);
 
-    // Show amber warning banner on the last day of the trial
-    if (trialDays != null && trialDays <= 0) {
+    // Show trial warning banner.
+    // ≤2 days remaining → soft amber "heads up" notice.
+    // ≤0 days            → urgent red expiry banner.
+    if (trialDays != null && trialDays <= 2) {
       return Column(
         children: [
-          _TrialExpiryBanner(onUpgrade: () => context.go('/paywall')),
+          trialDays <= 0
+              ? _TrialExpiryBanner(onUpgrade: () => context.go('/paywall'))
+              : _TrialWarnBanner(
+                  daysLeft: trialDays,
+                  onUpgrade: () => context.go('/paywall'),
+                ),
           Expanded(child: base),
         ],
       );
@@ -97,6 +104,7 @@ class MainScaffold extends ConsumerWidget {
               .titleMedium
               ?.copyWith(fontWeight: FontWeight.w600),
         ),
+        actions: const [_SyncIcon()],
       ),
       body: child,
       bottomNavigationBar: Container(
@@ -226,6 +234,86 @@ class MainScaffold extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shows cloud-sync state in the app bar (cloud-done / syncing spinner / cloud-off).
+class _SyncIcon extends StatelessWidget {
+  const _SyncIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<SyncStatus>(
+      valueListenable: syncNotifier,
+      builder: (_, status, __) {
+        switch (status) {
+          case SyncStatus.syncing:
+            return const Padding(
+              padding: EdgeInsets.all(14),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
+          case SyncStatus.error:
+            return Tooltip(
+              message: 'Sync error — will retry when online',
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Icon(Icons.cloud_off_outlined,
+                    size: 20, color: AppColors.statusCancelled),
+              ),
+            );
+          case SyncStatus.idle:
+            return const SizedBox.shrink();
+        }
+      },
+    );
+  }
+}
+
+/// Soft amber warning shown 1-2 days before trial expiry.
+class _TrialWarnBanner extends StatelessWidget {
+  const _TrialWarnBanner({required this.daysLeft, required this.onUpgrade});
+  final int daysLeft;
+  final VoidCallback onUpgrade;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = daysLeft == 1 ? '1 day left' : '$daysLeft days left';
+    return Material(
+      color: const Color(0xFFFFF3CD),
+      child: InkWell(
+        onTap: onUpgrade,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline,
+                  size: 16, color: Color(0xFF856404)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Trial ending soon ($label) — upgrade to keep access.',
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF856404)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Upgrade',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

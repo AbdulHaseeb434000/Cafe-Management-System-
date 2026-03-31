@@ -1,8 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:sqflite/sqflite.dart';
 
+import '../../core/database/database_helper.dart';
 import '../../services/supabase/supabase_service.dart';
+
+// Settings key used to persist the last successful staff list fetch.
+const _kCacheKey = 'staff_list_cache';
+const _kCacheAtKey = 'staff_list_cached_at';
 
 class StaffScreen extends StatefulWidget {
   const StaffScreen({super.key});
@@ -17,6 +25,10 @@ class _StaffScreenState extends State<StaffScreen> {
   String? _error;
   String? _currentAuthUserId;
 
+  /// Set to true when the displayed list comes from local cache (network failed).
+  bool _fromCache = false;
+  DateTime? _cachedAt;
+
   @override
   void initState() {
     super.initState();
@@ -25,14 +37,61 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() { _loading = true; _error = null; _fromCache = false; });
     try {
       final rows = await SupabaseService.listStaff();
+      await _saveCache(rows);
+      if (!mounted) return;
       setState(() { _staff = rows; _loading = false; });
     } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
+      // Network / auth failure — try serving the last cached list.
+      final cached = await _loadCache();
+      if (!mounted) return;
+      if (cached != null) {
+        setState(() {
+          _staff = cached;
+          _fromCache = true;
+          _loading = false;
+          _error = null; // suppress error UI when cache is available
+        });
+      } else {
+        setState(() { _error = e.toString(); _loading = false; });
+      }
     }
   }
+
+  // ── Cache helpers ────────────────────────────────────────────────────────────
+
+  Future<void> _saveCache(List<Map<String, dynamic>> rows) async {
+    final db = await DatabaseHelper.instance.database;
+    final now = DateTime.now().toIso8601String();
+    await db.insert('settings', {'key': _kCacheKey, 'value': jsonEncode(rows)},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert('settings', {'key': _kCacheAtKey, 'value': now},
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, dynamic>>?> _loadCache() async {
+    final db = await DatabaseHelper.instance.database;
+    final rows = await db.query('settings',
+        where: 'key = ?', whereArgs: [_kCacheKey]);
+    final atRows = await db.query('settings',
+        where: 'key = ?', whereArgs: [_kCacheAtKey]);
+    if (rows.isEmpty) return null;
+    try {
+      final list = (jsonDecode(rows.first['value'] as String) as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      if (atRows.isNotEmpty) {
+        _cachedAt = DateTime.parse(atRows.first['value'] as String);
+      }
+      return list;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ── UI helpers ───────────────────────────────────────────────────────────────
 
   Future<void> _showAddDialog() async {
     // Billing warning confirmation
@@ -269,17 +328,12 @@ class _StaffScreenState extends State<StaffScreen> {
       );
     }
     if (_staff.isEmpty) {
-      return const Column(
-        children: [
-          _SyncNoticeBanner(),
-          Expanded(child: Center(child: Text('No staff yet. Tap + to add someone.'))),
-        ],
-      );
+      return const Center(child: Text('No staff yet. Tap + to add someone.'));
     }
 
     return Column(
       children: [
-        const _SyncNoticeBanner(),
+        if (_fromCache) _CacheBanner(cachedAt: _cachedAt, onRetry: _load),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _load,
@@ -301,29 +355,50 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 }
 
-class _SyncNoticeBanner extends StatelessWidget {
-  const _SyncNoticeBanner();
+// ── Cache banner ───────────────────────────────────────────────────────────────
+
+class _CacheBanner extends StatelessWidget {
+  final DateTime? cachedAt;
+  final VoidCallback onRetry;
+
+  const _CacheBanner({required this.cachedAt, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
+    final label = cachedAt != null
+        ? DateFormat('d MMM, h:mm a').format(cachedAt!)
+        : 'unknown';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.5),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.wifi_outlined,
-              size: 16,
-              color: Theme.of(context).colorScheme.onSurfaceVariant),
+          Icon(Icons.cloud_off_outlined,
+              size: 16, color: Theme.of(context).colorScheme.onErrorContainer),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Each device syncs data automatically when connected to the internet or Wi-Fi. '
-              'Make sure staff members have an active connection when signing in for the first time.',
+              'Showing cached data · last updated $label',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: Theme.of(context).colorScheme.onErrorContainer,
                   ),
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Retry',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onErrorContainer,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -331,6 +406,8 @@ class _SyncNoticeBanner extends StatelessWidget {
     );
   }
 }
+
+// ── Staff tile ─────────────────────────────────────────────────────────────────
 
 class _StaffTile extends StatelessWidget {
   const _StaffTile({

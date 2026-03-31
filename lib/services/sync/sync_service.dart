@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/database/database_helper.dart';
+import '../../providers/auth_providers.dart';
 import '../supabase/supabase_service.dart';
 
 /// Offline-first sync between local SQLite and Supabase.
@@ -70,6 +71,8 @@ class SyncService {
     if (_pushing) return;
     if (!SupabaseService.isSignedIn) return;
     _pushing = true;
+    syncNotifier.value = SyncStatus.syncing;
+    bool anyError = false;
     try {
       final staff = await SupabaseService.fetchStaffRecord();
       if (staff == null) return;
@@ -108,10 +111,14 @@ class SyncService {
           );
         } catch (_) {
           // Per-table failure is non-fatal; try remaining tables
+          anyError = true;
         }
       }
+    } catch (_) {
+      anyError = true;
     } finally {
       _pushing = false;
+      syncNotifier.value = anyError ? SyncStatus.error : SyncStatus.idle;
     }
   }
 
@@ -180,7 +187,7 @@ class SyncService {
         'name': r['name'],
         'icon': r['icon'] ?? 'restaurant',
         'sort_order': r['sort_order'] ?? 0,
-        'created_at': r['created_at'],
+        'created_at': _ts(r['created_at']),
         'sync_pending': 0,
       });
 
@@ -196,7 +203,7 @@ class SyncService {
       'description': r['description'],
       'is_available': (r['is_available'] == true) ? 1 : 0,
       'image_path': r['image_path'],
-      'created_at': r['created_at'],
+      'created_at': _ts(r['created_at']),
       'sync_pending': 0,
     });
   }
@@ -216,7 +223,7 @@ class SyncService {
         'name': r['name'],
         'phone': r['phone'],
         'address': r['address'],
-        'created_at': r['created_at'],
+        'created_at': _ts(r['created_at']),
         'sync_pending': 0,
       });
 
@@ -240,8 +247,8 @@ class SyncService {
       'tax_amount': r['tax_amount'] ?? 0,
       'total': r['total'] ?? 0,
       'note': r['note'],
-      'created_at': r['created_at'],
-      'completed_at': r['completed_at'],
+      'created_at': _ts(r['created_at']),
+      'completed_at': _tsNullable(r['completed_at']),
       'sync_pending': 0,
     });
   }
@@ -274,7 +281,7 @@ class SyncService {
       'method': r['method'],
       'amount_tendered': r['amount_tendered'] ?? 0,
       'change_amount': r['change_amount'] ?? 0,
-      'paid_at': r['paid_at'],
+      'paid_at': _ts(r['paid_at']),
       'sync_pending': 0,
     });
   }
@@ -286,7 +293,7 @@ class SyncService {
         'unit': r['unit'],
         'quantity': r['quantity'] ?? 0,
         'low_stock_threshold': r['low_stock_threshold'] ?? 0,
-        'updated_at': r['updated_at'],
+        'updated_at': _ts(r['updated_at']),
         'is_deleted': (r['is_deleted'] == true) ? 1 : 0,
         'sync_pending': 0,
       });
@@ -300,7 +307,7 @@ class SyncService {
       'inventory_item_uuid': r['inventory_item_uuid'],
       'change_amount': r['change_amount'],
       'reason': r['reason'],
-      'created_at': r['created_at'],
+      'created_at': _ts(r['created_at']),
       'sync_pending': 0,
     });
   }
@@ -312,7 +319,7 @@ class SyncService {
         'amount': r['amount'],
         'description': r['description'] ?? '',
         'date': r['date'],
-        'created_at': r['created_at'],
+        'created_at': _ts(r['created_at']),
         'sync_pending': 0,
       });
 
@@ -323,9 +330,28 @@ class SyncService {
         'entity_type': r['entity_type'] ?? '',
         'entity_name': r['entity_name'] ?? '',
         'details': r['details'],
-        'created_at': r['created_at'],
+        'created_at': _ts(r['created_at']),
         'sync_pending': 0,
       });
+
+  // ── Timestamp normalisation ──────────────────────────────────────────────
+
+  /// Converts any Supabase timestamp (UTC ISO, possibly with offset or 'Z')
+  /// to a **naive local-time ISO string** (no timezone suffix) so it is
+  /// consistent with timestamps written by the app at creation time.
+  ///
+  /// All timestamps in SQLite are stored as naive local-time ISO strings.
+  /// This ensures `BETWEEN` range queries and `strftime('%H', …)` in SQLite
+  /// behave correctly without UTC-offset surprises.
+  static String _ts(dynamic val) {
+    if (val == null) return DateTime.now().toIso8601String();
+    return DateTime.parse(val as String).toLocal().toIso8601String();
+  }
+
+  static String? _tsNullable(dynamic val) {
+    if (val == null) return null;
+    return DateTime.parse(val as String).toLocal().toIso8601String();
+  }
 
   // ── SQLite helpers ───────────────────────────────────────────────────────
 
