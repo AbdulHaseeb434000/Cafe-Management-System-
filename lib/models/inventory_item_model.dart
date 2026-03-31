@@ -9,6 +9,7 @@ class InventoryItemModel {
   final double quantity;
   final double lowStockThreshold;
   final DateTime updatedAt;
+  final bool isDeleted;
 
   const InventoryItemModel({
     this.id,
@@ -18,6 +19,7 @@ class InventoryItemModel {
     this.quantity = 0,
     this.lowStockThreshold = 0,
     required this.updatedAt,
+    this.isDeleted = false,
   });
 
   bool get isLowStock => lowStockThreshold > 0 && quantity <= lowStockThreshold;
@@ -30,6 +32,7 @@ class InventoryItemModel {
     double? quantity,
     double? lowStockThreshold,
     DateTime? updatedAt,
+    bool? isDeleted,
   }) {
     return InventoryItemModel(
       id: id ?? this.id,
@@ -39,6 +42,7 @@ class InventoryItemModel {
       quantity: quantity ?? this.quantity,
       lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
       updatedAt: updatedAt ?? this.updatedAt,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 
@@ -50,6 +54,7 @@ class InventoryItemModel {
         'quantity': quantity,
         'low_stock_threshold': lowStockThreshold,
         'updated_at': DateHelpers.toIso(updatedAt),
+        'is_deleted': isDeleted ? 1 : 0,
       };
 
   factory InventoryItemModel.fromMap(Map<String, dynamic> map) =>
@@ -61,6 +66,7 @@ class InventoryItemModel {
         quantity: (map['quantity'] as num?)?.toDouble() ?? 0,
         lowStockThreshold: (map['low_stock_threshold'] as num?)?.toDouble() ?? 0,
         updatedAt: DateHelpers.fromIso(map['updated_at'] as String),
+        isDeleted: (map['is_deleted'] as int? ?? 0) == 1,
       );
 
   factory InventoryItemModel.create({

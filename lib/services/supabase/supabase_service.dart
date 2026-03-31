@@ -159,59 +159,68 @@ class SupabaseService {
 
   /// Staff member joins an existing restaurant using an invite code.
   /// Returns the staff row on success.
+  ///
+  /// The invite lookup and auth-user linking are performed atomically inside
+  /// the [claim_invite_code] SECURITY DEFINER RPC, which eliminates the
+  /// TOCTOU race present in a client-side check-then-update approach and
+  /// prevents cross-restaurant invite code enumeration.
   static Future<Map<String, dynamic>> joinWithInviteCode({
     required String email,
     required String password,
     required String inviteCode,
   }) async {
-    // 1. Find the pending staff row for this invite code
-    final pending = await client
-        .from('staff')
-        .select()
-        .eq('invite_code', inviteCode.trim().toUpperCase())
-        .maybeSingle();
-
-    if (pending == null) {
-      throw Exception('Invalid invite code. Please check with your manager.');
-    }
-    if (pending['auth_user_id'] != null) {
-      throw Exception('This invite code has already been used.');
-    }
-
-    // 2. Create the auth account
+    // 1. Create the auth account first so auth.uid() is available for the RPC.
     final response = await auth.signUp(email: email, password: password);
     if (response.user == null) {
       throw Exception('Signup failed. Please try again.');
     }
 
-    // 3. Link the auth user to the pending staff row
-    await client
-        .from('staff')
-        .update({
-          'auth_user_id': response.user!.id,
-          'invite_code': null,
-        })
-        .eq('id', pending['id'] as String);
-
-    return Map<String, dynamic>.from(pending);
+    // 2. Atomically validate the code and link this auth user to the staff row.
+    //    The RPC raises 'invalid_or_used_code' if the code is wrong or already
+    //    claimed, which surfaces as a PostgrestException we re-throw clearly.
+    try {
+      final result = await client.rpc(
+        'claim_invite_code',
+        params: {'p_code': inviteCode.trim().toUpperCase()},
+      );
+      return Map<String, dynamic>.from(result as Map);
+    } catch (e) {
+      // Sign the newly-created auth user out so they don't have a dangling
+      // account if the invite claim fails.
+      await auth.signOut();
+      final msg = e.toString();
+      if (msg.contains('expired_code')) {
+        throw Exception(
+          'This invite code has expired. Ask your manager to generate a new one.',
+        );
+      }
+      if (msg.contains('invalid_or_used_code')) {
+        throw Exception('Invalid invite code. Please check with your manager.');
+      }
+      rethrow;
+    }
   }
 
   /// Add a pending staff member and return the generated invite code.
-  static Future<String> addPendingStaff({
+  /// The code expires after 72 hours; after that the staff member cannot join
+  /// and the owner must generate a new invite.
+  static Future<({String code, DateTime expiresAt})> addPendingStaff({
     required String name,
     required String role,
   }) async {
     final staff = await fetchStaffRecord();
     if (staff == null) throw Exception('Not signed in');
     final code = _generateInviteCode();
+    final expiresAt = DateTime.now().toUtc().add(const Duration(hours: 72));
     await client.from('staff').insert({
       'restaurant_id': staff['restaurant_id'],
       'name': name,
       'role': role,
       'invite_code': code,
+      'invite_expires_at': expiresAt.toIso8601String(),
       'is_active': true,
     });
-    return code;
+    return (code: code, expiresAt: expiresAt);
   }
 
   /// Deactivate a staff member (soft-delete).

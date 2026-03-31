@@ -1,11 +1,20 @@
 import 'package:intl/intl.dart';
 
+/// All timestamps stored in SQLite are **naive local-time ISO strings**
+/// (no timezone suffix), produced by [toIso] and consumed by [fromIso].
+///
+/// Supabase pull-sync normalises incoming UTC timestamps to the device's
+/// local time before writing them to SQLite, so comparisons and SQLite's
+/// `strftime` function always operate in local time without any offset mismatch.
 class DateHelpers {
   DateHelpers._();
 
-  static String toIso(DateTime dt) => dt.toIso8601String();
+  /// Serialises [dt] to a naive local-time ISO 8601 string (no 'Z' or offset).
+  static String toIso(DateTime dt) => dt.toLocal().toIso8601String();
 
-  static DateTime fromIso(String iso) => DateTime.parse(iso);
+  /// Parses an ISO 8601 string and returns a local [DateTime].
+  /// Handles both naive strings and UTC strings (with 'Z' or '+00:00').
+  static DateTime fromIso(String iso) => DateTime.parse(iso).toLocal();
 
   static String formatDate(DateTime dt) => DateFormat('dd MMM yyyy').format(dt);
 

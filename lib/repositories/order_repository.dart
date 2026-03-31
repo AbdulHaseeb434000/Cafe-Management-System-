@@ -5,6 +5,15 @@ import '../models/order_model.dart';
 import '../models/order_item_model.dart';
 import 'activity_log_repository.dart';
 
+/// Thrown by [OrderRepository.insertForTable] when a concurrent write has
+/// already claimed the table before this device's transaction committed.
+class TableAlreadyOccupiedException implements Exception {
+  final String message;
+  const TableAlreadyOccupiedException(this.message);
+  @override
+  String toString() => message;
+}
+
 class OrderRepository {
   final DatabaseHelper _db;
   OrderRepository(this._db);
@@ -25,13 +34,29 @@ class OrderRepository {
       WHERE o.status NOT IN ('completed', 'cancelled')
       ORDER BY o.created_at DESC
     ''');
-    final orders = <OrderModel>[];
-    for (final row in rows) {
-      final order = OrderModel.fromMap(row);
-      final items = await getItems(order.id!);
-      orders.add(order.copyWith(items: items));
+
+    if (rows.isEmpty) return [];
+
+    // Batch-fetch all items for active orders in a single query instead of
+    // issuing one query per order (N+1 problem).
+    final orderIds = rows.map((r) => r['id'] as int).toList();
+    final placeholders = List.filled(orderIds.length, '?').join(', ');
+    final itemRows = await _db.rawQuery(
+      'SELECT * FROM order_items WHERE order_id IN ($placeholders) ORDER BY id ASC',
+      orderIds,
+    );
+
+    // Group items by order_id for O(n) assembly.
+    final itemsByOrderId = <int, List<OrderItemModel>>{};
+    for (final ir in itemRows) {
+      final item = OrderItemModel.fromMap(ir);
+      (itemsByOrderId[item.orderId] ??= []).add(item);
     }
-    return orders;
+
+    return rows.map((row) {
+      final order = OrderModel.fromMap(row);
+      return order.copyWith(items: itemsByOrderId[order.id!] ?? []);
+    }).toList();
   }
 
   Future<List<OrderModel>> getHistory({
@@ -101,6 +126,47 @@ class OrderRepository {
   Future<OrderModel> insert(OrderModel order) async {
     final id = await _db.insert(_ordersTable, order.toMap());
     final saved = order.copyWith(id: id);
+    ActivityLogRepository.instance.log(
+      actionType: 'order_created',
+      entityType: 'order',
+      entityName: saved.displayId,
+      details: _typeLabel(order.type),
+    );
+    return saved;
+  }
+
+  /// Insert a dine-in order for a specific table inside a SQLite transaction.
+  ///
+  /// Atomically checks whether an active order already exists for [tableId]
+  /// before inserting, preventing double-assignment when two devices race to
+  /// seat the same table simultaneously (offline-first concurrent writes).
+  ///
+  /// Throws [TableAlreadyOccupiedException] if the table already has an active
+  /// order, so the caller can show a meaningful error instead of silently
+  /// creating a duplicate order.
+  Future<OrderModel> insertForTable(OrderModel order) async {
+    assert(order.tableId != null, 'insertForTable requires a tableId');
+
+    late int newId;
+    newId = await _db.transaction<int>((txn) async {
+      // Check for an existing active order on this table within the transaction.
+      final existing = await txn.rawQuery('''
+        SELECT id FROM orders
+        WHERE table_id = ? AND status NOT IN ('completed', 'cancelled')
+        LIMIT 1
+      ''', [order.tableId]);
+
+      if (existing.isNotEmpty) {
+        throw TableAlreadyOccupiedException(
+          'Table already has an active order. '
+          'Please complete or cancel it before creating a new one.',
+        );
+      }
+
+      return txn.insert(_ordersTable, order.toMap());
+    });
+
+    final saved = order.copyWith(id: newId);
     ActivityLogRepository.instance.log(
       actionType: 'order_created',
       entityType: 'order',

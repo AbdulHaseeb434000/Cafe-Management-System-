@@ -227,7 +227,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
           actions: [
             TextButton(
               onPressed: () {
-                SupabaseService.signOut();
+                signOutAndClearNoRef();
                 Navigator.pop(ctx);
               },
               child: const Text('Sign Out'),
@@ -243,6 +243,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
                     ref.read(staffRoleProvider.notifier).state = 'owner';
+                    roleRouterNotifier.value = 'owner';
                     context.go('/');
                   }
                 } catch (e) {
@@ -336,7 +337,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
               Center(
                 child: TextButton(
                   onPressed: () async {
-                    await SupabaseService.signOut();
+                    await signOutAndClear(ref);
                     setState(() {});
                   },
                   child: const Text('Sign out of current account'),

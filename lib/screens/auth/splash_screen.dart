@@ -54,33 +54,63 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
 
       if (!SupabaseService.isPlanActive(restaurant)) {
-        // Trial expired or suspended — show paywall
-        context.go('/paywall');
-        return;
+        if (fromCache && _isWithinOfflineGracePeriod(restaurant)) {
+          // Offline plan-check policy (lenient): allow up to 24 hours of access
+          // after trial_end_date when the device cannot reach Supabase.
+          //
+          // Rationale: the user may have upgraded their plan already and the
+          // fresh data would reflect that — we must not lock out a paying
+          // customer just because they happen to be offline. After 24 hours
+          // without reconnecting the app blocks as normal.
+          //
+          // Signal the expired state to the scaffold (negative value triggers
+          // the expiry banner, but the user can still navigate the app).
+          ref.read(trialDaysProvider.notifier).state = 0;
+        } else {
+          // Either online with confirmed expiry, or offline and past grace period.
+          context.go('/paywall');
+          return;
+        }
       }
 
       // Cache restaurant and trial days for settings/scaffold
       ref.read(restaurantProvider.notifier).state = restaurant;
-      ref.read(trialDaysProvider.notifier).state =
-          SupabaseService.trialDaysLeft(restaurant);
+      if (SupabaseService.isPlanActive(restaurant)) {
+        ref.read(trialDaysProvider.notifier).state =
+            SupabaseService.trialDaysLeft(restaurant);
+      }
 
-      String role = 'owner';
+      String role = 'waiter'; // default to least-privileged until confirmed
       if (!fromCache) {
         // Fetch staff role from Supabase (only possible when online)
         final staff = await SupabaseService.fetchStaffRecord();
         if (!mounted) return;
-        role = staff?['role'] as String? ?? 'owner';
+        role = staff?['role'] as String? ?? 'waiter';
         await _cacheStaffRole(role);
       } else {
         // Offline — use cached role
-        role = await _loadCachedStaffRole() ?? 'owner';
+        role = await _loadCachedStaffRole() ?? 'waiter';
       }
 
+      // Update both the Riverpod provider (for UI) and the ValueNotifier
+      // bridge (for GoRouter redirect) in one place.
       ref.read(staffRoleProvider.notifier).state = role;
+      roleRouterNotifier.value = role;
       _routeByRole(role);
     } else {
       context.go('/login');
     }
+  }
+
+  /// Returns true if the device is within the 24-hour offline grace period
+  /// that starts at [trial_end_date]. Used only when [fromCache] is true.
+  static bool _isWithinOfflineGracePeriod(Map<String, dynamic> restaurant) {
+    final trialEnd = restaurant['trial_end_date'];
+    if (trialEnd == null) return false;
+    final gracePeriodEnd = DateTime.parse(trialEnd as String)
+        .toUtc()
+        .add(const Duration(hours: 24));
+    return DateTime.now().toUtc().isBefore(gracePeriodEnd);
   }
 
   Future<void> _cacheRestaurant(Map<String, dynamic> restaurant) async {

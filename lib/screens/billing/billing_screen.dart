@@ -80,13 +80,11 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
     return _discountValue.clamp(0, _subtotal);
   }
 
-  double get _taxPercent {
-    final settings =
-        ref.read(settingsNotifierProvider).valueOrNull ?? {};
-    return double.tryParse(
-            settings[AppConstants.settingTaxPercent] ?? '0') ??
-        0;
-  }
+  /// Tax percent is read from the order record (set at order-creation time),
+  /// NOT from the current settings. This prevents the wrong rate being applied
+  /// if the tax setting is changed between when the order was placed and when
+  /// the customer pays.
+  double get _taxPercent => _order?.taxPercent ?? 0;
 
   String get _currencySymbol {
     final settings =

@@ -48,6 +48,7 @@ class DatabaseHelper {
     'categories', 'menu_items', 'cafe_tables', 'customers',
     'orders', 'order_items', 'payments',
     'inventory_items', 'inventory_logs', 'expenses',
+    'activity_logs',
   };
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -70,6 +71,24 @@ class DatabaseHelper {
       await db.execute(
         'ALTER TABLE orders ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0',
       );
+    }
+    if (oldVersion < 6) {
+      // Add sync_pending to activity_logs so audit trail is pushed to cloud
+      await db.execute(
+        'ALTER TABLE activity_logs ADD COLUMN sync_pending INTEGER NOT NULL DEFAULT 1',
+      );
+    }
+    if (oldVersion < 7) {
+      // Add soft-delete flag to inventory_items so deleting an item preserves
+      // its historical stock adjustment logs instead of cascading-deleting them.
+      await db.execute(
+        'ALTER TABLE inventory_items ADD COLUMN is_deleted INTEGER NOT NULL DEFAULT 0',
+      );
+      // Note: ON DELETE CASCADE → ON DELETE SET NULL on inventory_logs FK
+      // cannot be changed via ALTER TABLE in SQLite; it takes effect only for
+      // newly created databases. Existing installs retain cascade behaviour on
+      // the FK, but because we now soft-delete (is_deleted=1) rather than
+      // hard-delete, the cascade path is never triggered in practice.
     }
   }
 
@@ -206,12 +225,13 @@ class DatabaseHelper {
   static const _createInventoryItems = '''
     CREATE TABLE inventory_items (
       id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-      uuid                TEXT NOT NULL UNIQUE,
-      name                TEXT NOT NULL,
-      unit                TEXT NOT NULL,
-      quantity            REAL NOT NULL DEFAULT 0,
-      low_stock_threshold REAL NOT NULL DEFAULT 0,
-      updated_at          TEXT NOT NULL,
+      uuid                TEXT    NOT NULL UNIQUE,
+      name                TEXT    NOT NULL,
+      unit                TEXT    NOT NULL,
+      quantity            REAL    NOT NULL DEFAULT 0,
+      low_stock_threshold REAL    NOT NULL DEFAULT 0,
+      updated_at          TEXT    NOT NULL,
+      is_deleted          INTEGER NOT NULL DEFAULT 0,
       sync_pending        INTEGER NOT NULL DEFAULT 1
     )
   ''';
@@ -226,7 +246,7 @@ class DatabaseHelper {
       reason              TEXT,
       created_at          TEXT    NOT NULL,
       sync_pending        INTEGER NOT NULL DEFAULT 1,
-      FOREIGN KEY (inventory_item_id) REFERENCES inventory_items (id) ON DELETE CASCADE
+      FOREIGN KEY (inventory_item_id) REFERENCES inventory_items (id) ON DELETE SET NULL
     )
   ''';
 
@@ -252,13 +272,14 @@ class DatabaseHelper {
 
   static const _createActivityLogs = '''
     CREATE TABLE activity_logs (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      uuid        TEXT    NOT NULL UNIQUE,
-      action_type TEXT    NOT NULL,
-      entity_type TEXT    NOT NULL,
-      entity_name TEXT    NOT NULL,
-      details     TEXT,
-      created_at  TEXT    NOT NULL
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      uuid         TEXT    NOT NULL UNIQUE,
+      action_type  TEXT    NOT NULL,
+      entity_type  TEXT    NOT NULL,
+      entity_name  TEXT    NOT NULL,
+      details      TEXT,
+      created_at   TEXT    NOT NULL,
+      sync_pending INTEGER NOT NULL DEFAULT 1
     )
   ''';
 

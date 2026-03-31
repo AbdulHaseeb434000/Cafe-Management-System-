@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../services/supabase/supabase_service.dart';
+import '../../providers/auth_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
+// Note: SupabaseService removed — sign-out now goes through signOutAndClear()
 
 /// Shown when the trial has expired and no active plan exists.
 /// Displays pricing tiers and a contact/upgrade prompt.
-class PaywallScreen extends StatelessWidget {
+class PaywallScreen extends ConsumerWidget {
   const PaywallScreen({super.key});
 
   static const _plans = [
@@ -37,7 +39,7 @@ class PaywallScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -48,7 +50,7 @@ class PaywallScreen extends StatelessWidget {
             icon: const Icon(Icons.logout, size: 18),
             label: const Text('Sign out'),
             onPressed: () async {
-              await SupabaseService.signOut();
+              await signOutAndClear(ref);
               if (context.mounted) context.go('/login');
             },
           ),

@@ -13,6 +13,7 @@ import '../../providers/order_providers.dart';
 import '../../providers/table_providers.dart';
 import '../../providers/repository_providers.dart';
 import '../../providers/settings_providers.dart';
+import '../../repositories/order_repository.dart' show TableAlreadyOccupiedException;
 
 class NewOrderScreen extends ConsumerStatefulWidget {
   final int? preselectedTableId;
@@ -135,7 +136,21 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
     );
 
     final repo = ref.read(orderRepositoryProvider);
-    final saved = await repo.insert(order);
+    // For dine-in, use the transactional insert that checks for a concurrent
+    // active order on the same table before committing.
+    late OrderModel saved;
+    try {
+      saved = cart.tableId != null
+          ? await repo.insertForTable(order)
+          : await repo.insert(order);
+    } on TableAlreadyOccupiedException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
 
     // Insert order items
     for (final cartItem in cart.items) {
