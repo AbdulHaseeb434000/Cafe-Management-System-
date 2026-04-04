@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/constants/app_constants.dart';
 import '../core/theme/app_colors.dart';
+import '../core/utils/currency_formatter.dart';
 import '../providers/auth_providers.dart';
 import '../providers/settings_providers.dart';
 import '../services/supabase/supabase_service.dart';
@@ -83,12 +85,46 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
     return idx == -1 ? 0 : idx;
   }
 
+  Future<void> _confirmSignOut(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style:
+                FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      await signOutAndClear(ref);
+      if (mounted) context.go('/login');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final role = ref.watch(staffRoleProvider);
-    final trialDays = ref.watch(trialDaysProvider);
     // Pre-load settings so they are ready for PDF generation on any screen.
-    ref.watch(settingsNotifierProvider);
+    final settings = ref.watch(settingsNotifierProvider).valueOrNull ?? {};
+    // Keep CurrencyFormatter in sync with the user's chosen symbol.
+    CurrencyFormatter.currentSymbol =
+        settings[AppConstants.settingCurrencySymbol] ??
+            AppConstants.defaultCurrencySymbol;
+    // L1: Use trialDaysProvider if set; fall back to computing from restaurant.
+    final restaurant = ref.watch(restaurantProvider);
+    int? trialDays = ref.watch(trialDaysProvider);
+    if (trialDays == null && restaurant != null) {
+      trialDays = SupabaseService.trialDaysLeft(restaurant);
+    }
     final isWaiter = role == 'waiter';
     final bottomItems = isWaiter ? _waiterNavItems : _navItems;
     final extras = isWaiter ? const <_NavItem>[] : _railExtras;
@@ -122,25 +158,37 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 48,
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu),
-            tooltip: 'More',
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
-        ),
+        leading: extras.isEmpty
+            ? null
+            : Builder(
+                builder: (ctx) => DrawerButton(
+                  onPressed: () => Scaffold.of(ctx).openDrawer(),
+                ),
+              ),
         title: Text(
-          bottomItems.firstWhere((e) => path.startsWith(e.path),
+          bottomItems
+              .firstWhere((e) => path.startsWith(e.path),
                   orElse: () => extras.firstWhere(
                       (e) => path.startsWith(e.path),
-                      orElse: () => bottomItems.first))
+                      orElse: () => const _NavItem(
+                          label: '',
+                          icon: Icons.home_outlined,
+                          activeIcon: Icons.home,
+                          path: '')))
               .label,
           style: Theme.of(context)
               .textTheme
               .titleMedium
               ?.copyWith(fontWeight: FontWeight.w600),
         ),
-        actions: const [_SyncIcon()],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Sign out',
+            onPressed: () => _confirmSignOut(context),
+          ),
+          const _SyncIcon(),
+        ],
       ),
       body: widget.child,
       bottomNavigationBar: Container(
@@ -203,6 +251,15 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
                           ),
                     ),
                   ],
+                ),
+              ),
+              trailing: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: IconButton(
+                  icon: const Icon(Icons.logout),
+                  tooltip: 'Sign out',
+                  color: AppColors.textSecondary,
+                  onPressed: () => _confirmSignOut(context),
                 ),
               ),
               destinations: allItems

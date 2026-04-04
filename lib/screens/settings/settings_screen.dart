@@ -624,7 +624,7 @@ class _TableManagementTile extends ConsumerWidget {
                 autofocus: true,
                 decoration: const InputDecoration(
                     labelText: 'Table name',
-                    hintText: 'e.g. Table 1')),
+                    )),
             const SizedBox(height: 12),
             TextField(
                 controller: capCtrl,

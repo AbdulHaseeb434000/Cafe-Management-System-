@@ -202,7 +202,7 @@ class TablesScreen extends ConsumerWidget {
               controller: nameCtrl,
               autofocus: true,
               decoration: const InputDecoration(
-                  labelText: 'Table name', hintText: 'e.g. Table 1'),
+                  labelText: 'Table name'),
               textCapitalization: TextCapitalization.words,
             ),
             const SizedBox(height: 12),

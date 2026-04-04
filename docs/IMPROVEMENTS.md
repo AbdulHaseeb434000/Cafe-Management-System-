@@ -144,46 +144,40 @@
 
 **Goal:** Fix visual bugs and confusing messages.
 
-- [ ] **L14** Add logout button to `MainScaffold` AppBar
-  - `lib/widgets/main_scaffold.dart`
-  - Add `IconButton(Icons.logout)` in `AppBar.actions` for all roles
-  - Confirm dialog before signing out
+- [x] **L14** Add logout button to `MainScaffold` AppBar
+  - `lib/widgets/main_scaffold.dart` — `IconButton(Icons.logout)` in mobile `AppBar.actions` and tablet `NavigationRail.trailing`; both show confirm dialog via `_confirmSignOut()`
 
-- [ ] **L6** Fix currency default and update everywhere
-  - `lib/core/constants/app_constants.dart` — set `defaultCurrencySymbol = '\$'`
-  - Audit all hardcoded `'Rs.'` strings across all screens — replace with currency from settings
-  - Ensure `CurrencyFormatter` reads from `settingsProvider` so changes propagate immediately
+- [x] **L6** Fix currency default and update everywhere
+  - `lib/core/constants/app_constants.dart` — `defaultCurrencySymbol` changed to `'$'`
+  - `lib/core/utils/currency_formatter.dart` — added `static String currentSymbol`; `format()` / `formatCompact()` use it as default
+  - `lib/widgets/main_scaffold.dart` — updates `CurrencyFormatter.currentSymbol` on every rebuild from settings, so symbol propagates immediately
 
-- [ ] **L7** Fix "no tables" message distinction
-  - `lib/screens/orders/new_order_screen.dart`
-  - When `allTables.isEmpty`: "No tables added yet" + button to go to Settings → Tables
-  - When `allTables.isNotEmpty && freeTables.isEmpty`: "No free tables available" (current)
+- [x] **L7** Fix "no tables" message distinction
+  - `lib/screens/orders/new_order_screen.dart` — `tables.isEmpty` → "No tables added yet" + "Go to Settings"; `freeTables.isEmpty` → "All tables are occupied" + "Go to Tables"
 
-- [ ] **L8** Remove example placeholder text from input fields
-  - Audit all `hintText` values containing `'e.g.'` or specific names/amounts
-  - Replace with generic descriptors: `'Customer name'`, `'Amount'`, `'Phone number'`
+- [x] **L8** Remove example placeholder text from input fields
+  - `lib/screens/menu/menu_screen.dart` — removed `hintText: 'e.g. Beverages'`
+  - `lib/screens/tables/tables_screen.dart` — removed `hintText: 'e.g. Table 1'`
+  - `lib/screens/settings/settings_screen.dart` — removed `hintText: 'e.g. Table 1'` from table manager
+  - `lib/screens/auth/signup_screen.dart` — `'e.g. Plato Café'` → `'Restaurant name'`, `'e.g. Ahmed Khan'` → `'Your full name'`, `'e.g. AB3X9Z'` → `'6-character code'`, updated currency label
 
-- [ ] **L13** Fix expense list item text overlap
-  - `lib/screens/expenses/expenses_screen.dart:209`
-  - Give description `Expanded` with `overflow: ellipsis`; give amount `constraints: BoxConstraints(minWidth: 80)`
+- [x] **L13** Fix expense list item text overlap
+  - `lib/screens/expenses/expenses_screen.dart` — removed `Flexible(fit: FlexFit.loose)` wrapper from amount; amount now takes natural width after description `Expanded` fills remaining space
 
-- [ ] **L1** Fix trial banner when `trialDaysProvider` is null
-  - `lib/widgets/main_scaffold.dart:67`
-  - Fall back to computing days from `restaurantProvider` if `trialDaysProvider` is null
+- [x] **L1** Fix trial banner when `trialDaysProvider` is null
+  - `lib/widgets/main_scaffold.dart` — if `trialDaysProvider` is null, falls back to `SupabaseService.trialDaysLeft(restaurantProvider)` so banner shows on first load
 
-- [ ] **L2** Improve "complete setup" dialog clarity
-  - `lib/screens/auth/login_screen.dart:148`
-  - Detect whether restaurant row or staff row is missing; show specific instructions
+- [x] **L2** Improve "complete setup" dialog clarity
+  - `lib/screens/auth/login_screen.dart` — message updated: "No restaurant was found for your account. This usually means signup was interrupted before it finished."
 
-- [ ] **L4** Fix `MainScaffold` title for untracked routes
-  - Return `''` instead of falling back to first nav item
+- [x] **L4** Fix `MainScaffold` title for untracked routes
+  - `lib/widgets/main_scaffold.dart` — `orElse` returns `_NavItem(label: '')` instead of `bottomItems.first`
 
-- [ ] **L5** Add `DrawerButton` in AppBar on mobile when extras exist
-  - `lib/widgets/main_scaffold.dart`
+- [x] **L5** Add `DrawerButton` in AppBar on mobile when extras exist
+  - `lib/widgets/main_scaffold.dart` — `leading` is `null` when `extras.isEmpty` (waiter); uses `DrawerButton` when drawer is present
 
-- [ ] **M5** Ensure currency has default before signup currency dialog
-  - `lib/screens/auth/signup_screen.dart`
-  - Save `currency_symbol = '\$'` before showing picker; update to selection after
+- [x] **M5** Ensure currency has default before signup currency dialog
+  - `lib/screens/auth/signup_screen.dart` — saves `defaultCurrencySymbol` before showing dialog so skipping doesn't leave symbol unset
 
 ---
 

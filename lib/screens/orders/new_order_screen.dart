@@ -338,6 +338,7 @@ class _TableSelectionStep extends ConsumerWidget {
         final freeTables =
             tables.where((t) => t.isFree || t.isReserved).toList();
         if (freeTables.isEmpty) {
+          final noTablesAtAll = tables.isEmpty;
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(32),
@@ -347,13 +348,23 @@ class _TableSelectionStep extends ConsumerWidget {
                   const Icon(Icons.table_restaurant_outlined,
                       size: 48, color: Colors.grey),
                   const SizedBox(height: 12),
-                  const Text('No free tables available',
-                      style: TextStyle(fontSize: 16)),
+                  Text(
+                    noTablesAtAll
+                        ? 'No tables added yet'
+                        : 'All tables are occupied',
+                    style: const TextStyle(fontSize: 16)),
+                  const SizedBox(height: 8),
+                  if (noTablesAtAll)
+                    Text(
+                      'Add tables in Settings before placing a dine-in order.',
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
                   const SizedBox(height: 20),
                   OutlinedButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: const Text('Go to Tables'),
-                    onPressed: () => context.go('/tables'),
+                    icon: Icon(noTablesAtAll ? Icons.settings_outlined : Icons.add),
+                    label: Text(noTablesAtAll ? 'Go to Settings' : 'Go to Tables'),
+                    onPressed: () => context.go(noTablesAtAll ? '/settings' : '/tables'),
                   ),
                   const SizedBox(height: 8),
                   TextButton(

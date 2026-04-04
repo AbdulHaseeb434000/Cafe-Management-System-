@@ -218,15 +218,12 @@ class _ExpenseTile extends ConsumerWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            Flexible(
-              fit: FlexFit.loose,
-              child: Text(
-                CurrencyFormatter.format(expense.amount),
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: AppColors.error),
-              ),
+            Text(
+              CurrencyFormatter.format(expense.amount),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AppColors.error),
             ),
           ],
         ),

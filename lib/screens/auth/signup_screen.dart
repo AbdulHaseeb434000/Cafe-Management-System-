@@ -125,6 +125,11 @@ class _SignupFormState extends ConsumerState<SignupForm> {
   }
 
   Future<void> _showCurrencyDialog() async {
+    // Pre-save the default so skipping the dialog still sets a valid symbol.
+    await ref.read(settingsNotifierProvider.notifier).set(
+          AppConstants.settingCurrencySymbol,
+          AppConstants.defaultCurrencySymbol,
+        );
     final ctrl = TextEditingController(text: AppConstants.defaultCurrencySymbol);
     await showDialog<void>(
       context: context,
@@ -143,7 +148,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
               controller: ctrl,
               autofocus: true,
               decoration: const InputDecoration(
-                labelText: 'Symbol (e.g. Rs., \$, £, €)',
+                labelText: r'Currency symbol ($, £, €, Rs.)',
               ),
             ),
           ],
@@ -311,7 +316,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
               AuthTextField(
                 controller: _restaurantCtrl,
                 label: 'Restaurant / Café Name',
-                hint: 'e.g. Plato Café',
+                hint: 'Restaurant name',
                 textCapitalization: TextCapitalization.words,
                 validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
               ),
@@ -321,7 +326,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             AuthTextField(
               controller: _nameCtrl,
               label: _joinMode ? 'Your Name' : 'Owner Name',
-              hint: 'e.g. Ahmed Khan',
+              hint: 'Your full name',
               textCapitalization: TextCapitalization.words,
               validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
             ),
@@ -364,7 +369,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
               AuthTextField(
                 controller: _codeCtrl,
                 label: 'Invite Code',
-                hint: 'e.g. AB3X9Z',
+                hint: '6-character code',
                 textCapitalization: TextCapitalization.characters,
                 validator: (v) =>
                     v == null || v.trim().length != 6 ? 'Enter the 6-character code' : null,

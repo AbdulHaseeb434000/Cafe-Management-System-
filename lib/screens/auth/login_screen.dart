@@ -310,8 +310,9 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Your account was created but setup didn\'t finish. '
-                  'Enter your details to complete it.',
+                  'No restaurant was found for your account. '
+                  'This usually means signup was interrupted before it finished. '
+                  'Enter your restaurant name and your name to complete setup.',
                   style: TextStyle(fontSize: 13),
                 ),
                 const SizedBox(height: 16),

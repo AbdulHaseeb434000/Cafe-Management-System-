@@ -18,7 +18,7 @@ class AppConstants {
 
   // Default values
   static const double defaultTaxPercent = 0.0;
-  static const String defaultCurrencySymbol = 'Rs.';
+  static const String defaultCurrencySymbol = r'$';
 
   // Order types
   static const String orderTypeDineIn = 'dine_in';

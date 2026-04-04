@@ -198,7 +198,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
           controller: controller,
           autofocus: true,
           decoration: const InputDecoration(
-              labelText: 'Category name', hintText: 'e.g. Beverages'),
+              labelText: 'Category name'),
           textCapitalization: TextCapitalization.words,
         ),
         actions: [
