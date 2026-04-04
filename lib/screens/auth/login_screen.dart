@@ -162,8 +162,9 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
       final staff = await SupabaseService.fetchStaffRecord();
       if (!mounted) return;
 
-      final role = staff?['role'] as String? ?? 'owner';
-      ref.read(staffRoleProvider.notifier).state = role;
+      // Default to least-privilege role if record is missing.
+      final role = staff?['role'] as String? ?? 'waiter';
+      setRole(role, ref);
 
       unawaited(SyncService.instance.triggerOnLogin());
       if (role == 'kitchen') {
@@ -242,8 +243,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
                   );
                   if (ctx.mounted) Navigator.pop(ctx);
                   if (mounted) {
-                    ref.read(staffRoleProvider.notifier).state = 'owner';
-                    roleRouterNotifier.value = 'owner';
+                    setRole('owner', ref);
                     context.go('/');
                   }
                 } catch (e) {

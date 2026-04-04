@@ -10,22 +10,21 @@
 
 **Goal:** Fix all CRITICAL bugs. No release until these are done.
 
-- [ ] **C1** Fix timezone bug in `isPlanActive()` and `trialDaysLeft()`
+- [x] **C1** Fix timezone bug in `isPlanActive()` and `trialDaysLeft()`
   - `lib/services/supabase/supabase_service.dart`
   - Use `DateTime.parse(trialEnd as String).toUtc()` on both sides
 
-- [ ] **C2** Normalize default role to `'waiter'` everywhere
-  - `lib/screens/auth/login_screen.dart:165` — `?? 'owner'` → `?? 'waiter'`
-  - Confirm `lib/screens/auth/splash_screen.dart` already uses `'waiter'`
+- [x] **C2** Normalize default role to `'waiter'` everywhere
+  - `lib/screens/auth/login_screen.dart` — `?? 'owner'` → `?? 'waiter'`
+  - `lib/screens/auth/splash_screen.dart` confirmed uses `'waiter'`
 
-- [ ] **C3** Whitelist valid plan values in `isPlanActive()`
+- [x] **C3** Whitelist valid plan values in `isPlanActive()`
   - `lib/services/supabase/supabase_service.dart`
-  - Return `true` only for `['starter', 'standard', 'business']`; else `false`
+  - Returns `true` only for `{'starter', 'standard', 'business'}`; else `false`
 
-- [ ] **C4** Fix dual state: add `setRole(String role, WidgetRef ref)` helper
+- [x] **C4** Fix dual state: added `setRole(String role, WidgetRef ref)` helper
   - `lib/providers/auth_providers.dart`
-  - Helper updates both `staffRoleProvider` and `roleRouterNotifier` atomically
-  - Replace all direct writes to either with this helper
+  - Replaces all direct writes in `login_screen.dart` and `splash_screen.dart`
 
 ---
 
@@ -229,35 +228,42 @@
 
 ---
 
-## Design Decisions (Require Owner Input Before Implementation)
+## Design Decisions — RESOLVED
 
-### D1 — Backup export vs. cloud sync
-Cloud sync (Supabase) now makes the `.platodesk` file export partially redundant.
-- **Option A:** Keep export as user-controlled archive; update description to clarify it's a supplemental backup.
-- **Option B:** Remove import (too risky for conflicts); keep export only for data portability.
-- **Recommended:** Option A. Keep both. The export is a safety net when Supabase is unavailable.
+### D1 — Backup export vs. cloud sync ✓
+- **Decision:** Keep export as user-controlled archive. Remove the import feature (conflict risk with cloud sync).
+- Update export label to: "Local Backup Archive — your data is also synced to the cloud."
+- Tracked in Iteration 5.
 
-### D2 — Multi-device data loading
-- New device login: `SyncService.pullAll()` downloads all restaurant data from Supabase after login.
-- Local SQLite is rebuilt on the new device from the cloud data.
-- **Gap:** Currently `SyncService.start()` runs at app launch before auth. Need to decouple (see H8 above).
+### D2 — Multi-device data loading ✓
+- **Decision:** Accepted. H8 fix (Iteration 3) decouples sync pull from app start; triggers after login.
+- New device login → full pull from Supabase → SQLite rebuilt locally.
 
-### D3 — Staff deactivation and token expiry
-- Deactivating a staff member sets `is_active = false` in Supabase.
-- Their Supabase JWT expires within the configured session window (default 1 hour). After that, they cannot make authenticated requests.
-- A device with a cached token will still work until the JWT expires. This is acceptable for most use cases.
-- For immediate revocation: requires Supabase Auth admin `deleteUser()` and re-invite if needed.
+### D3 — Staff deactivation: immediate revocation, free reactivation within billing month ✓
+- **Decision:** Immediate revocation via Supabase Auth ban on deactivation.
+- Each staff member has a `billing_cycle_start` date (= their `activated_at` date).
+- Deactivate + reactivate within the same billing month = no extra charge.
+- Reactivate after the billing month lapses = new cycle starts, new billing applies.
+- Fields to add to Supabase `staff` table: `activated_at`, `billing_cycle_start`, `is_billed_this_cycle`.
+- On reactivation: if `DateTime.now()` is within current billing month of `billing_cycle_start` → reactivate free. Else → show "New billing cycle will start. Contact support." dialog.
+- Tracked in Iteration 5.
 
-### D4 — What happens when owner deletes the app
-- Supabase data persists; restaurant and all records remain in the cloud.
-- Subscription/billing is manual (WhatsApp), so no automated cancellation.
-- Owner can reinstall → login → sync pull → all data restored.
-- **Gap:** No in-app "Delete my account / restaurant" flow. Add under Settings if needed.
+### D4 — "Delete my account" flow ✓
+- **Decision:** Add in-app option under Settings. Anonymize, do NOT delete data (needed for audit).
+- On delete: set `restaurant.status = 'deleted'`, anonymize name/email in staff table, ban all staff auth users.
+- Retain all orders/payments/inventory records in Supabase permanently.
+- Require owner to confirm via a typed confirmation prompt before proceeding.
+- Tracked in Iteration 5.
 
-### D5 — Subscription billing model
-- **Current:** Manual activation via WhatsApp after payment. No automated billing.
-- **Proposed:** Bill at start of each monthly cycle. Staff additions mid-cycle are noted but not double-billed.
-- This is a business process decision, not a code change, until automated billing (Stripe etc.) is integrated.
+### D5 — Billing model: per-user per-month, fixed billing date per employee ✓
+- **Decision:** Each staff member is billed separately on a per-user-per-month basis.
+- Billing date per employee = their `activated_at` date (first ever activation).
+- Owner's own subscription billed from `restaurant.created_at`.
+- Deactivate/reactivate within the same billing month = no extra charge (cycle already paid).
+- Reactivate after billing month lapses = new cycle, new billing.
+- No automated billing yet (manual via WhatsApp). Supabase stores billing metadata for reference.
+- Settings → Manage Subscription shows: each staff member, their billing date, active/inactive status.
+- Tracked in Iteration 5.
 
 ---
 

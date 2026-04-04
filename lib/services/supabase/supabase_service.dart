@@ -248,16 +248,21 @@ class SupabaseService {
   // ── Subscription / plan helpers ──────────────────────────────────────────
 
   /// Returns true if the restaurant's subscription is currently active
-  /// (plan = 'trial' with trial not expired, or plan = 'starter'/'standard'/'business').
+  /// (plan = 'trial' with trial not expired, or a known paid plan).
   static bool isPlanActive(Map<String, dynamic> restaurant) {
-    final plan = restaurant['plan'] as String? ?? 'trial';
-    if (plan == 'suspended') return false;
+    final plan = restaurant['plan'] as String? ?? '';
     if (plan == 'trial') {
       final trialEnd = restaurant['trial_end_date'];
       if (trialEnd == null) return false;
-      return DateTime.parse(trialEnd as String).isAfter(DateTime.now().toUtc());
+      // Parse as UTC then compare against UTC now — consistent regardless of
+      // the device's local timezone.
+      return DateTime.parse(trialEnd as String)
+          .toUtc()
+          .isAfter(DateTime.now().toUtc());
     }
-    return true; // starter / standard / business
+    // Only explicitly known paid plans are considered active.
+    // Unknown / empty / 'suspended' values all return false.
+    return const {'starter', 'standard', 'business'}.contains(plan);
   }
 
   /// Returns days left in trial, or null if not on trial.

@@ -93,9 +93,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
 
       // Update both the Riverpod provider (for UI) and the ValueNotifier
-      // bridge (for GoRouter redirect) in one place.
-      ref.read(staffRoleProvider.notifier).state = role;
-      roleRouterNotifier.value = role;
+      // bridge (for GoRouter redirect) atomically via setRole.
+      setRole(role, ref);
       _routeByRole(role);
     } else {
       context.go('/login');

@@ -34,6 +34,16 @@ final syncNotifier = ValueNotifier<SyncStatus>(SyncStatus.idle);
 /// provider's least-privilege default.
 final roleRouterNotifier = ValueNotifier<String>('waiter');
 
+/// Sets the staff role atomically in both the Riverpod provider (for UI) and
+/// the [roleRouterNotifier] bridge (for GoRouter redirect).
+///
+/// Always use this helper instead of writing to either store directly so they
+/// can never fall out of sync.
+void setRole(String role, WidgetRef ref) {
+  ref.read(staffRoleProvider.notifier).state = role;
+  roleRouterNotifier.value = role;
+}
+
 /// Signs out the current user and atomically resets all auth-related state.
 ///
 /// Call this at every sign-out site instead of calling
