@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants/app_constants.dart';
+import '../../models/table_model.dart';
+import '../../providers/table_providers.dart';
 import '../../services/sync/sync_service.dart';
 import '../../providers/auth_providers.dart';
 import '../../providers/settings_providers.dart';
+import '../../services/session_service.dart';
 import '../../services/supabase/supabase_service.dart';
 import '../../core/theme/app_colors.dart';
 import 'auth_widgets.dart';
@@ -121,6 +124,8 @@ class _SignupFormState extends ConsumerState<SignupForm> {
     if (!mounted) return;
     await _showCurrencyDialog();
     if (!mounted) return;
+    await _showOnboardingDialog();
+    if (!mounted) return;
     await _showTrialDialog();
   }
 
@@ -184,6 +189,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
     final role = staff['role'] as String? ?? 'waiter';
     setRole(role, ref);
     unawaited(SyncService.instance.triggerOnLogin());
+    SessionService.instance.touch(); // start inactivity timer
 
     if (!mounted) return;
     if (role == 'kitchen') {
@@ -191,6 +197,234 @@ class _SignupFormState extends ConsumerState<SignupForm> {
     } else {
       context.go('/');
     }
+  }
+
+  /// 4-step onboarding wizard shown once after the owner completes signup.
+  /// Steps: (1) Cafe type, (2) Tables, (3) Tax rate, (4) Receipt header/footer.
+  Future<void> _showOnboardingDialog() async {
+    int step = 0;
+    const steps = 4;
+
+    // Step 1 — cafe type
+    String cafeType = 'café';
+    const cafeTypes = ['QSR', 'Café', 'Fine Dining', 'Other'];
+
+    // Step 2 — tables
+    int tableCount = 0;
+
+    // Step 3 — tax
+    final taxCtrl = TextEditingController(text: '0');
+
+    // Step 4 — receipt
+    final headerCtrl = TextEditingController();
+    final footerCtrl = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) {
+          Widget stepContent() {
+            switch (step) {
+              case 0:
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('What type of café do you run?',
+                        style: Theme.of(ctx).textTheme.bodyMedium),
+                    const SizedBox(height: 12),
+                    ...cafeTypes.map((t) => RadioListTile<String>(
+                          dense: true,
+                          title: Text(t),
+                          value: t,
+                          groupValue: cafeType,
+                          onChanged: (v) => setInner(() => cafeType = v!),
+                        )),
+                  ],
+                );
+              case 1:
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('How many tables does your venue have?',
+                        style: Theme.of(ctx).textTheme.bodyMedium),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline),
+                          onPressed: tableCount > 0
+                              ? () => setInner(() => tableCount--)
+                              : null,
+                        ),
+                        SizedBox(
+                          width: 56,
+                          child: Text(
+                            tableCount == 0 ? 'None' : '$tableCount',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(ctx).textTheme.headlineSmall,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline),
+                          onPressed: tableCount < 30
+                              ? () => setInner(() => tableCount++)
+                              : null,
+                        ),
+                      ],
+                    ),
+                    if (tableCount > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Tables will be named Table 1 – Table $tableCount',
+                          style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textSecondary),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                  ],
+                );
+              case 2:
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('What is your default tax rate?',
+                        style: Theme.of(ctx).textTheme.bodyMedium),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: taxCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Tax rate (%)',
+                        suffixText: '%',
+                        hintText: '0',
+                      ),
+                    ),
+                  ],
+                );
+              case 3:
+              default:
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Customise your receipts (optional)',
+                        style: Theme.of(ctx).textTheme.bodyMedium),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: headerCtrl,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Receipt header',
+                        hintText: 'e.g. Thank you for visiting!',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: footerCtrl,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Receipt footer',
+                        hintText: 'e.g. Follow us @platodesk',
+                      ),
+                    ),
+                  ],
+                );
+            }
+          }
+
+          return AlertDialog(
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text('Quick Setup',
+                        style: Theme.of(ctx)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    const Spacer(),
+                    Text('${step + 1} / $steps',
+                        style: Theme.of(ctx)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: AppColors.textSecondary)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                LinearProgressIndicator(
+                  value: (step + 1) / steps,
+                  borderRadius: BorderRadius.circular(4),
+                  backgroundColor: AppColors.divider,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: stepContent(),
+            ),
+            actions: [
+              if (step > 0)
+                TextButton(
+                  onPressed: () => setInner(() => step--),
+                  child: const Text('Back'),
+                ),
+              if (step < steps - 1)
+                FilledButton(
+                  onPressed: () => setInner(() => step++),
+                  child: const Text('Next'),
+                )
+              else
+                FilledButton(
+                  onPressed: () async {
+                    // Save all settings in one batch
+                    final toSave = <String, String>{
+                      AppConstants.settingCafeType: cafeType,
+                      AppConstants.settingTaxPercent:
+                          taxCtrl.text.trim().isEmpty
+                              ? '0'
+                              : taxCtrl.text.trim(),
+                    };
+                    if (headerCtrl.text.trim().isNotEmpty) {
+                      toSave[AppConstants.settingReceiptHeader] =
+                          headerCtrl.text.trim();
+                    }
+                    if (footerCtrl.text.trim().isNotEmpty) {
+                      toSave[AppConstants.settingReceiptFooter] =
+                          footerCtrl.text.trim();
+                    }
+                    await ref
+                        .read(settingsNotifierProvider.notifier)
+                        .setAll(toSave);
+
+                    // Auto-create tables
+                    if (tableCount > 0) {
+                      for (var i = 1; i <= tableCount; i++) {
+                        await ref
+                            .read(tablesProvider.notifier)
+                            .add(TableModel.create(name: 'Table $i'));
+                      }
+                    }
+
+                    if (ctx.mounted) Navigator.of(ctx).pop();
+                  },
+                  child: const Text('Finish'),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+
+    taxCtrl.dispose();
+    headerCtrl.dispose();
+    footerCtrl.dispose();
   }
 
   Future<void> _showTrialDialog() async {
@@ -234,6 +468,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
             onPressed: () {
               Navigator.of(ctx).pop();
+              SessionService.instance.touch(); // start inactivity timer
               context.go('/');
             },
             child: const Text("Let's go!"),

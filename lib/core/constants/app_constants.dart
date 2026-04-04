@@ -15,10 +15,13 @@ class AppConstants {
   static const String settingReceiptFooter = 'receipt_footer';
   static const String settingLogoPath = 'logo_path';
   static const String settingCurrencySymbol = 'currency_symbol';
+  static const String settingCafeType = 'cafe_type';
+  static const String settingSessionTimeout = 'session_timeout_minutes';
 
   // Default values
   static const double defaultTaxPercent = 0.0;
   static const String defaultCurrencySymbol = r'$';
+  static const int defaultSessionTimeoutMinutes = 30;
 
   // Order types
   static const String orderTypeDineIn = 'dine_in';

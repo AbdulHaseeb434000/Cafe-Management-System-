@@ -8,6 +8,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/database/database_helper.dart';
 import '../../providers/auth_providers.dart';
+import '../../services/session_service.dart';
 import '../../services/supabase/supabase_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../services/sync/sync_service.dart';
@@ -252,6 +253,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
       await _saveCredentials();
 
       unawaited(SyncService.instance.triggerOnLogin());
+      SessionService.instance.touch(); // start inactivity timer
       if (role == 'kitchen') {
         context.go('/kitchen');
       } else {

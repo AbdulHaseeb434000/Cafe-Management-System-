@@ -6,6 +6,7 @@ import '../core/theme/app_colors.dart';
 import '../core/utils/currency_formatter.dart';
 import '../providers/auth_providers.dart';
 import '../providers/settings_providers.dart';
+import '../services/session_service.dart';
 import '../services/supabase/supabase_service.dart';
 
 class MainScaffold extends ConsumerStatefulWidget {
@@ -38,6 +39,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkPlanExpiry();
+      _checkSessionTimeout();
     }
   }
 
@@ -46,6 +48,20 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
     if (restaurant != null && !SupabaseService.isPlanActive(restaurant)) {
       if (mounted) context.go('/paywall');
     }
+  }
+
+  void _checkSessionTimeout() {
+    if (!SessionService.instance.checkTimeout()) return;
+    SessionService.instance.clear();
+    signOutAndClear(ref);
+    if (!mounted) return;
+    context.go('/login');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Session expired. Please sign in again.'),
+        duration: Duration(seconds: 4),
+      ),
+    );
   }
 
   // Full nav for owner / manager
@@ -119,6 +135,11 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
     CurrencyFormatter.currentSymbol =
         settings[AppConstants.settingCurrencySymbol] ??
             AppConstants.defaultCurrencySymbol;
+    // Sync session timeout from settings so changes apply immediately.
+    final timeoutMin = int.tryParse(
+            settings[AppConstants.settingSessionTimeout] ?? '') ??
+        AppConstants.defaultSessionTimeoutMinutes;
+    SessionService.instance.timeout = Duration(minutes: timeoutMin);
     // L1: Use trialDaysProvider if set; fall back to computing from restaurant.
     final restaurant = ref.watch(restaurantProvider);
     int? trialDays = ref.watch(trialDaysProvider);
@@ -129,9 +150,17 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
     final bottomItems = isWaiter ? _waiterNavItems : _navItems;
     final extras = isWaiter ? const <_NavItem>[] : _railExtras;
     final isTablet = MediaQuery.of(context).size.width >= 600;
+    // Wrap child in a transparent GestureDetector to reset the inactivity
+    // timer on any tap or drag, without blocking child hit-tests.
+    final trackedChild = GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTapDown: (_) => SessionService.instance.touch(),
+      onPanDown: (_) => SessionService.instance.touch(),
+      child: widget.child,
+    );
     final base = isTablet
-        ? _buildTabletLayout(context, bottomItems, extras)
-        : _buildMobileLayout(context, bottomItems, extras);
+        ? _buildTabletLayout(context, bottomItems, extras, trackedChild)
+        : _buildMobileLayout(context, bottomItems, extras, trackedChild);
 
     // Show trial warning banner.
     // ≤2 days remaining → soft amber "heads up" notice.
@@ -152,7 +181,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
     return base;
   }
 
-  Widget _buildMobileLayout(BuildContext context, List<_NavItem> bottomItems, List<_NavItem> extras) {
+  Widget _buildMobileLayout(BuildContext context, List<_NavItem> bottomItems,
+      List<_NavItem> extras, Widget child) {
     final path = _currentPath(context);
     final idx = _bottomIndex(path, bottomItems);
     return Scaffold(
@@ -190,7 +220,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
           const _SyncIcon(),
         ],
       ),
-      body: widget.child,
+      body: child,
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.divider)),
@@ -214,7 +244,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
     );
   }
 
-  Widget _buildTabletLayout(BuildContext context, List<_NavItem> bottomItems, List<_NavItem> extras) {
+  Widget _buildTabletLayout(BuildContext context, List<_NavItem> bottomItems,
+      List<_NavItem> extras, Widget child) {
     final path = _currentPath(context);
     final allItems = [...bottomItems, ...extras];
     final idx = _railIndex(path, allItems);
@@ -273,7 +304,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
                   .toList(),
             ),
           ),
-          Expanded(child: widget.child),
+          Expanded(child: child),
         ],
       ),
     );

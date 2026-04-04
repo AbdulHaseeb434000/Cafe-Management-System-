@@ -185,15 +185,17 @@
 
 **Goal:** Better first-run experience; security hardening.
 
-- [ ] **L10** Add multi-step onboarding after first signup
-  - `lib/screens/auth/signup_screen.dart`
-  - Steps: (1) Cafe type selector (QSR / Cafe / Fine Dining / Other), (2) Number of tables (auto-create), (3) Default tax rate, (4) Receipt header/footer
-  - Save all to `settings` table before routing to dashboard
+- [x] **L10** Add multi-step onboarding after first signup
+  - `lib/screens/auth/signup_screen.dart` — `_showOnboardingDialog()` inserted between currency dialog and trial dialog
+  - 4 steps: (1) Café type radio selector, (2) Table count picker with auto-create, (3) Tax rate, (4) Receipt header/footer
+  - Settings saved via `settingsNotifierProvider.setAll()`; tables created via `tablesProvider.notifier.add()`
 
-- [ ] **M12** Add session timeout / inactivity lock
-  - Create `lib/services/session_service.dart`
-  - Track last interaction timestamp; after N minutes (configurable in settings, default 30), show re-auth prompt or sign out
-  - Use `AppLifecycleState` for background/foreground transitions
+- [x] **M12** Add session timeout / inactivity lock
+  - Created `lib/services/session_service.dart` — singleton tracking last activity; `timeout` duration updated from settings
+  - `lib/core/constants/app_constants.dart` — added `settingSessionTimeout`, `settingCafeType`, `defaultSessionTimeoutMinutes = 30`
+  - `lib/widgets/main_scaffold.dart` — `GestureDetector` wraps body to call `touch()` on tap/drag; `didChangeAppLifecycleState.resumed` calls `_checkSessionTimeout()` → auto-signs-out and shows snackbar
+  - `lib/providers/auth_providers.dart` — `signOutAndClear` and `signOutAndClearNoRef` both call `SessionService.instance.clear()`
+  - `lib/screens/auth/login_screen.dart` and `signup_screen.dart` — call `SessionService.instance.touch()` on successful auth/navigation
 
 ---
 

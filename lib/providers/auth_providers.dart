@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/session_service.dart';
 import '../services/supabase/supabase_service.dart';
 
 /// Cloud sync status shown in the app bar.
@@ -60,6 +61,7 @@ Future<void> signOutAndClear(WidgetRef ref) async {
   ref.read(restaurantProvider.notifier).state = null;
   roleRouterNotifier.value = 'waiter';
   syncNotifier.value = SyncStatus.idle;
+  SessionService.instance.clear();
 }
 
 /// Ref-free sign-out for contexts without a [WidgetRef] (e.g. plain
@@ -70,4 +72,5 @@ Future<void> signOutAndClearNoRef() async {
   await SupabaseService.signOut();
   roleRouterNotifier.value = 'waiter';
   syncNotifier.value = SyncStatus.idle;
+  SessionService.instance.clear();
 }
