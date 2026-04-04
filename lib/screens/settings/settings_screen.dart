@@ -2,19 +2,17 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/supabase/supabase_service.dart';
 import '../../providers/auth_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/plan_constants.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/utils/date_helpers.dart';
 import '../../models/table_model.dart';
 import '../../providers/settings_providers.dart';
 import '../../providers/table_providers.dart';
-import '../../services/backup/backup_service.dart';
-import '../../core/database/database_helper.dart';
-import '../../providers/auth_providers.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/section_header.dart';
 
@@ -99,6 +97,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SectionHeader(title: 'Plan'),
             const _PlanStatusTile(),
 
+            const SectionHeader(title: 'Manage Subscription'),
+            ListTile(
+              leading: const Icon(Icons.chat_outlined,
+                  size: 22, color: AppColors.textSecondary),
+              title: const Text('Chat on WhatsApp'),
+              subtitle: const Text('Upgrade, downgrade or cancel your plan'),
+              trailing: const Icon(Icons.open_in_new,
+                  size: 16, color: AppColors.textSecondary),
+              onTap: () async {
+                final name =
+                    ref.read(restaurantProvider)?['name'] as String? ??
+                        AppConstants.appName;
+                final msg = Uri.encodeFull(
+                    'Hi, I\'d like to manage my PlatoDesk subscription for $name');
+                await launchUrl(
+                  Uri.parse(
+                      'https://wa.me/${PlanConstants.supportWhatsApp}?text=$msg'),
+                  mode: LaunchMode.externalApplication,
+                );
+              },
+            ),
+            const Divider(height: 1, indent: 56),
+            ListTile(
+              leading: const Icon(Icons.email_outlined,
+                  size: 22, color: AppColors.textSecondary),
+              title: const Text('Email Support'),
+              subtitle: const Text(PlanConstants.supportEmail),
+              trailing: const Icon(Icons.open_in_new,
+                  size: 16, color: AppColors.textSecondary),
+              onTap: () async {
+                final name =
+                    ref.read(restaurantProvider)?['name'] as String? ??
+                        AppConstants.appName;
+                final subject = Uri.encodeFull(
+                    'Manage PlatoDesk subscription — $name');
+                await launchUrl(
+                  Uri.parse(
+                      'mailto:${PlanConstants.supportEmail}?subject=$subject'),
+                );
+              },
+            ),
+
             const SectionHeader(title: 'Billing'),
             _SettingsTile(
               icon: Icons.percent_outlined,
@@ -175,9 +215,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onTap: () => context.go('/staff'),
               ),
             ],
-
-            const SectionHeader(title: 'Backup & Restore'),
-            _BackupRestoreSection(),
 
             const SectionHeader(title: 'About'),
             Container(
@@ -613,195 +650,6 @@ class _TableManagementTile extends ConsumerWidget {
               Navigator.pop(ctx);
             },
             child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Backup & Restore Section ──────────────────────────────────────────────────
-
-class _BackupRestoreSection extends ConsumerStatefulWidget {
-  @override
-  ConsumerState<_BackupRestoreSection> createState() =>
-      _BackupRestoreSectionState();
-}
-
-class _BackupRestoreSectionState
-    extends ConsumerState<_BackupRestoreSection> {
-  bool _exporting = false;
-  bool _importing = false;
-
-  BackupService get _backup =>
-      BackupService(DatabaseHelper.instance);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        ListTile(
-          leading: const Icon(Icons.cloud_upload_outlined,
-              size: 22, color: AppColors.textSecondary),
-          title: const Text('Export Backup'),
-          subtitle: const Text(
-              'Save all data to a .platodesk file and share to Google Drive, email, etc.'),
-          trailing: _exporting
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.chevron_right, size: 18,
-                  color: AppColors.textSecondary),
-          onTap: _exporting ? null : _export,
-        ),
-        const Divider(height: 1, indent: 56),
-        ListTile(
-          leading: const Icon(Icons.cloud_download_outlined,
-              size: 22, color: AppColors.textSecondary),
-          title: const Text('Import Backup'),
-          subtitle: const Text(
-              'Restore from a .platodesk file. Choose Merge to keep existing data.'),
-          trailing: _importing
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.chevron_right, size: 18,
-                  color: AppColors.textSecondary),
-          onTap: _importing ? null : _import,
-        ),
-      ],
-    );
-  }
-
-  Future<void> _export() async {
-    setState(() => _exporting = true);
-    try {
-      await _backup.export();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Export failed: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _exporting = false);
-    }
-  }
-
-  Future<void> _import() async {
-    setState(() => _importing = true);
-    try {
-      final payload = await _backup.pickAndParse();
-      if (payload == null) {
-        if (mounted) setState(() => _importing = false);
-        return;
-      }
-
-      final summary = await _backup.analyze(payload);
-
-      if (!mounted) return;
-      final mode = await _showImportDialog(summary);
-      if (mode == null) {
-        setState(() => _importing = false);
-        return;
-      }
-
-      if (mode == 'merge') {
-        await _backup.importMerge(payload);
-      } else {
-        await _backup.importReplace(payload);
-      }
-
-      // Refresh all providers
-      ref.read(settingsNotifierProvider.notifier).load();
-      ref.read(tablesProvider.notifier).load();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Backup restored successfully')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Import failed: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _importing = false);
-    }
-  }
-
-  Future<String?> _showImportDialog(
-      BackupConflictSummary summary) async {
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Restore Backup'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (summary.exportedAt != null)
-                Text(
-                  'Backup from: ${DateHelpers.formatDateTime(summary.exportedAt!)}',
-                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary),
-                ),
-              if (summary.deviceName != null)
-                Text('Device: ${summary.deviceName}',
-                    style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary)),
-              const SizedBox(height: 12),
-              Text('New records to add: ${summary.totalNew}',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.success)),
-              Text(
-                  'Already exist (will be skipped in Merge): ${summary.totalExisting}'),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: AppColors.warning.withValues(alpha: 0.4)),
-                ),
-                child: const Text(
-                  '⚠ Full Replace will erase all current data.',
-                  style: TextStyle(
-                      fontSize: 12, color: AppColors.warning),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel')),
-          OutlinedButton(
-            onPressed: () async {
-              final ok = await showConfirmDialog(
-                ctx,
-                title: 'Full Replace',
-                message:
-                    'This will DELETE all current data and replace it with the backup. Continue?',
-                confirmLabel: 'Replace All',
-                destructive: true,
-              );
-              if (ok && ctx.mounted) Navigator.pop(ctx, 'replace');
-            },
-            style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.error,
-                side: const BorderSide(color: AppColors.error)),
-            child: const Text('Full Replace'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, 'merge'),
-            child: const Text('Merge'),
           ),
         ],
       ),

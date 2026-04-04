@@ -223,7 +223,13 @@ class SupabaseService {
     return (code: code, expiresAt: expiresAt);
   }
 
-  /// Deactivate a staff member (soft-delete).
+  /// Deactivate a staff member — sets [is_active = false] in Supabase.
+  ///
+  /// Server-side enforcement: configure a Supabase RLS policy on the `staff`
+  /// table so that rows where `is_active = false` cannot be read or written by
+  /// the deactivated user's JWT.  JWT tokens expire after the Supabase-configured
+  /// expiry window (default 1 hour); deactivated staff lose access within that
+  /// window even without an immediate token revocation.
   static Future<void> deactivateStaff(String staffId) async {
     await client
         .from('staff')

@@ -1,45 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
-// Note: SupabaseService removed — sign-out now goes through signOutAndClear()
+import '../../core/constants/plan_constants.dart';
 
 /// Shown when the trial has expired and no active plan exists.
-/// Displays pricing tiers and a contact/upgrade prompt.
+/// Displays pricing tiers and actionable contact buttons.
 class PaywallScreen extends ConsumerWidget {
   const PaywallScreen({super.key});
 
-  static const _plans = [
-    _PlanInfo(
-      name: 'Starter',
-      price: 'Rs. 2,000',
-      period: '/month',
-      devices: '1 device',
-      highlights: ['All core features', 'Unlimited orders', 'PDF receipts & reports'],
-      recommended: false,
-    ),
-    _PlanInfo(
-      name: 'Standard',
-      price: 'Rs. 4,500',
-      period: '/month',
-      devices: 'Up to 3 devices',
-      highlights: ['Everything in Starter', 'Multi-staff roles', 'Priority support'],
-      recommended: true,
-    ),
-    _PlanInfo(
-      name: 'Business',
-      price: 'Rs. 9,000',
-      period: '/month',
-      devices: 'Up to 8 devices',
-      highlights: ['Everything in Standard', 'Cloud backup & sync', 'Advanced analytics'],
-      recommended: false,
-    ),
-  ];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final restaurant = ref.watch(restaurantProvider);
+    final restaurantName =
+        restaurant?['name'] as String? ?? AppConstants.appName;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -62,7 +40,8 @@ class PaywallScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Icon(Icons.lock_clock_outlined, size: 48, color: AppColors.primary),
+              const Icon(Icons.lock_clock_outlined,
+                  size: 48, color: AppColors.primary),
               const SizedBox(height: 12),
               Text(
                 'Your free trial has ended',
@@ -82,7 +61,7 @@ class PaywallScreen extends ConsumerWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 28),
-              ..._plans.map((plan) => _PlanCard(plan: plan)),
+              ...PlanConstants.plans.map((plan) => _PlanCard(plan: plan)),
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(16),
@@ -91,25 +70,57 @@ class PaywallScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.phone_outlined, color: AppColors.brown),
+                    Row(
+                      children: [
+                        const Icon(Icons.support_agent_outlined,
+                            color: AppColors.brown),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Ready to subscribe?',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 6),
                     Text(
-                      'To activate your plan, contact us on WhatsApp or email.\n'
-                      'We\'ll enable your subscription within minutes.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                      'Contact us to activate your plan within minutes.',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: AppColors.textSecondary),
                     ),
-                    const SizedBox(height: 10),
-                    // Placeholder — replace with real contact info
-                    Text(
-                      'support@platodesk.app',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _launchWhatsApp(restaurantName),
+                            icon: const Icon(Icons.chat_outlined, size: 16),
+                            label: const Text('WhatsApp'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: const BorderSide(color: AppColors.primary),
+                            ),
                           ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _launchEmail(restaurantName),
+                            icon: const Icon(Icons.email_outlined, size: 16),
+                            label: const Text('Email'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: const BorderSide(color: AppColors.primary),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -121,11 +132,27 @@ class PaywallScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Future<void> _launchWhatsApp(String restaurantName) async {
+    final msg = Uri.encodeFull(
+        'Hi, I\'d like to upgrade PlatoDesk for $restaurantName');
+    final uri = Uri.parse(
+        'https://wa.me/${PlanConstants.supportWhatsApp}?text=$msg');
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _launchEmail(String restaurantName) async {
+    final subject =
+        Uri.encodeFull('Upgrade PlatoDesk — $restaurantName');
+    final uri = Uri.parse(
+        'mailto:${PlanConstants.supportEmail}?subject=$subject');
+    await launchUrl(uri);
+  }
 }
 
 class _PlanCard extends StatelessWidget {
   const _PlanCard({required this.plan});
-  final _PlanInfo plan;
+  final PlanInfo plan;
 
   @override
   Widget build(BuildContext context) {
@@ -139,7 +166,12 @@ class _PlanCard extends StatelessWidget {
           width: plan.recommended ? 2 : 1,
         ),
         boxShadow: plan.recommended
-            ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.12), blurRadius: 12, offset: const Offset(0, 4))]
+            ? [
+                BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4))
+              ]
             : null,
       ),
       child: Padding(
@@ -151,19 +183,21 @@ class _PlanCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(plan.name,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700, color: AppColors.brown)),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700, color: AppColors.brown)),
                 if (plan.recommended)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text('Popular',
-                        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600)),
                   ),
               ],
             ),
@@ -198,9 +232,11 @@ class _PlanCard extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle_outline, size: 15, color: AppColors.success),
+                      const Icon(Icons.check_circle_outline,
+                          size: 15, color: AppColors.success),
                       const SizedBox(width: 6),
-                      Text(h, style: Theme.of(context).textTheme.bodySmall),
+                      Text(h,
+                          style: Theme.of(context).textTheme.bodySmall),
                     ],
                   ),
                 )),
@@ -209,22 +245,4 @@ class _PlanCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _PlanInfo {
-  const _PlanInfo({
-    required this.name,
-    required this.price,
-    required this.period,
-    required this.devices,
-    required this.highlights,
-    required this.recommended,
-  });
-
-  final String name;
-  final String price;
-  final String period;
-  final String devices;
-  final List<String> highlights;
-  final bool recommended;
 }

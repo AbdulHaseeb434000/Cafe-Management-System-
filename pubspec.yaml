@@ -50,6 +50,9 @@ dependencies:
   # Connectivity detection (sync trigger)
   connectivity_plus: ^6.0.3
 
+  # External URL / deep-link launcher (WhatsApp, mailto)
+  url_launcher: ^6.3.0
+
   # Secure credential storage for "Remember Me" login
   flutter_secure_storage: ^9.2.2
 

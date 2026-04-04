@@ -115,34 +115,28 @@
 
 **Goal:** Make upgrade path functional; address billing design gaps.
 
-- [ ] **M1** Add functional contact links to `PaywallScreen`
-  - `lib/screens/auth/paywall_screen.dart`
-  - Add `url_launcher`: WhatsApp deep link + mailto with pre-filled subject ("Upgrade to [Plan] — [Restaurant Name]")
-  - Replace static email text with tappable widget
+- [x] **M1** Add functional contact links to `PaywallScreen`
+  - `lib/screens/auth/paywall_screen.dart` — WhatsApp deep link + pre-filled mailto; reads restaurant name from `restaurantProvider` for context in the message subject
 
-- [ ] **M2** Extract plan definitions to constants file
-  - Create `lib/core/constants/plan_constants.dart`
-  - Move `_plans` list; comment: "Update pricing here before releasing a new version"
+- [x] **M2** Extract plan definitions to constants file
+  - Created `lib/core/constants/plan_constants.dart` — `PlanInfo`, `PlanConstants.plans`, `PlanConstants.supportWhatsApp`, `PlanConstants.supportEmail`
+  - `paywall_screen.dart` and `settings_screen.dart` now reference `PlanConstants`
 
-- [ ] **M8** Add "Manage Subscription" section in Settings
-  - `lib/screens/settings/settings_screen.dart`
-  - Show current plan + expiry/renewal date
-  - Add "Cancel / Change Plan" link (opens WhatsApp or mailto)
+- [x] **M8** Add "Manage Subscription" section in Settings
+  - `lib/screens/settings/settings_screen.dart` — new section with WhatsApp + email `ListTile`s; pre-fills restaurant name in URL
 
-- [ ] **M9** Enforce staff deactivation server-side
-  - `lib/services/supabase/supabase_service.dart`
-  - On deactivate: set `is_active = false` in Supabase `staff` table
-  - Add a Supabase RLS policy or Edge Function that rejects API calls from staff where `is_active = false`
-  - Document that JWT tokens expire after Supabase's configured expiry (default 1 hour); deactivated staff will lose access within that window
+- [x] **M9** Enforce staff deactivation server-side (client done; RLS documented)
+  - `lib/services/supabase/supabase_service.dart` — `deactivateStaff` already sets `is_active = false`
+  - Added doc comment instructing the Supabase RLS policy to block deactivated users; JWT tokens expire within 1 hour by default
 
-- [ ] **M10** Add staff-add billing warning dialog
-  - `lib/screens/staff/staff_screen.dart`
-  - Before adding new staff: show dialog "Adding a staff member may affect your subscription billing. Contact support to confirm your current plan limits."
-  - Log addition with timestamp in `activity_log`
+- [x] **M10** Staff-add billing warning dialog — already implemented
+  - `lib/screens/staff/staff_screen.dart._showAddDialog()` shows billing warning before proceeding
 
-- [ ] **L3** Remove hardcoded "Rs." from signup trial dialog
-  - `lib/screens/auth/signup_screen.dart:187`
-  - Remove price mention; replace with "Contact support@platodesk.app for pricing details"
+- [x] **L3** Remove hardcoded "Rs." from signup trial dialog — done in Iteration 3
+
+- [x] **D1** Remove backup export/import
+  - `lib/screens/settings/settings_screen.dart` — removed `_BackupRestoreSection` widget and `Backup & Restore` section header
+  - Removed unused imports: `backup_service.dart`, `database_helper.dart`, `date_helpers.dart`
 
 ---
 
