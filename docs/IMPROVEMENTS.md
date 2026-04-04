@@ -1,6 +1,6 @@
 # Improvement Plan
 
-> Consult AUDIT.md for full issue details.
+> Consult AUDIT.md for full issue details and file/line references.
 > Work on branch: `claude/audit-and-plan-INSyA`
 > Complete iterations in order. Mark tasks `[x]` when done.
 
@@ -8,122 +8,262 @@
 
 ## Iteration 1 — Critical Auth & Security Fixes
 
-**Goal:** Fix all CRITICAL bugs that could allow unauthorized access or cause auth failures.
+**Goal:** Fix all CRITICAL bugs. No release until these are done.
 
 - [ ] **C1** Fix timezone bug in `isPlanActive()` and `trialDaysLeft()`
   - `lib/services/supabase/supabase_service.dart`
-  - Ensure both comparisons use `DateTime.now().toUtc()`
+  - Use `DateTime.parse(trialEnd as String).toUtc()` on both sides
 
-- [ ] **C2** Normalize default role to `'waiter'` (least privilege) everywhere
-  - `lib/screens/auth/login_screen.dart:165` — change `?? 'owner'` → `?? 'waiter'`
-  - Verify `lib/screens/auth/splash_screen.dart` already uses `'waiter'`
+- [ ] **C2** Normalize default role to `'waiter'` everywhere
+  - `lib/screens/auth/login_screen.dart:165` — `?? 'owner'` → `?? 'waiter'`
+  - Confirm `lib/screens/auth/splash_screen.dart` already uses `'waiter'`
 
 - [ ] **C3** Whitelist valid plan values in `isPlanActive()`
   - `lib/services/supabase/supabase_service.dart`
-  - Return `true` only for `['starter', 'standard', 'business']`; everything else returns `false`
+  - Return `true` only for `['starter', 'standard', 'business']`; else `false`
 
-- [ ] **C4** Fix dual state: `roleRouterNotifier` vs `staffRoleProvider`
+- [ ] **C4** Fix dual state: add `setRole(String role, WidgetRef ref)` helper
   - `lib/providers/auth_providers.dart`
-  - Whenever `staffRoleProvider` is written, update `roleRouterNotifier` in the same call
-  - Add a helper `setRole(String role, WidgetRef ref)` that updates both atomically
+  - Helper updates both `staffRoleProvider` and `roleRouterNotifier` atomically
+  - Replace all direct writes to either with this helper
 
 ---
 
 ## Iteration 2 — Router & Navigation Fixes
 
-**Goal:** Fix routing security and navigation correctness.
+**Goal:** Secure routing; fix navigation edge cases.
 
 - [ ] **H1** Fix route prefix matching bug
   - `lib/core/router/app_router.dart`
-  - Replace `path.startsWith(r)` with `path == r || path.startsWith('$r/')`
+  - `path.startsWith(r)` → `path == r || path.startsWith('$r/')`
 
 - [ ] **M7** Remove dead `/signup` redirect rule
   - `lib/core/router/app_router.dart`
-  - Remove `/signup` from the redirect whitelist
 
 - [ ] **H2** Add mid-session plan expiry enforcement in `MainScaffold`
   - `lib/widgets/main_scaffold.dart`
-  - Watch `trialDaysProvider`; if it drops to 0 AND plan is trial, call `context.go('/paywall')`
-  - Or add a periodic `Timer` (e.g., every 5 minutes) that re-checks plan status
+  - Periodic `Timer` (every 5 min) that calls `SupabaseService.isPlanActive()` and redirects to `/paywall` if expired
+
+- [ ] **L9** Hide FAB/bottom nav during full-screen preview routes
+  - Identify where scaffold FAB bleeds into kitchen ticket / bill preview
+  - Set `resizeToAvoidBottomInset: false` or conditionally suppress FAB on preview routes
 
 ---
 
 ## Iteration 3 — Auth UX & State Fixes
 
-**Goal:** Fix state management issues and improve login/signup reliability.
+**Goal:** Reliable login/signup; clean state on sign-out.
 
 - [ ] **H4** Replace `signOutAndClearNoRef()` with `signOutAndClear(ref)` in `LoginScreen`
   - `lib/screens/auth/login_screen.dart:230`
 
 - [ ] **H5** Reset `syncNotifier` in both sign-out functions
-  - `lib/providers/auth_providers.dart`
-  - Set `syncNotifier.value = SyncStatus.idle`
+  - `lib/providers/auth_providers.dart` — set `syncNotifier.value = SyncStatus.idle`
 
 - [ ] **H3** Add offline restaurant fallback in `LoginScreen._submit()`
   - `lib/screens/auth/login_screen.dart`
-  - Load cached restaurant from `settings` table if `fetchRestaurant()` returns null
+  - Load from `settings` table cache if `fetchRestaurant()` returns null
 
-- [ ] **M6** Fix stale `SupabaseService.isSignedIn` check
-  - Replace with `Supabase.instance.client.auth.currentSession != null`
+- [ ] **M6** Fix stale `isSignedIn` check
+  - Replace `SupabaseService.isSignedIn` with `Supabase.instance.client.auth.currentSession != null`
 
 - [ ] **M3** Sanitize exception messages shown to users
-  - `lib/screens/auth/login_screen.dart`, `lib/screens/auth/signup_screen.dart`
-  - Map `AuthException` error codes to user-friendly strings
-  - Show a generic fallback for unknown errors
+  - Map `AuthException` error codes to user-friendly strings in both `login_screen.dart` and `signup_screen.dart`
+  - Generic fallback: "Something went wrong. Please try again."
 
 - [ ] **M4** Handle orphaned auth account after failed `createRestaurant()`
   - `lib/screens/auth/signup_screen.dart`
-  - On `createRestaurant()` failure: attempt sign-out + show retry guidance
+  - On failure: call `SupabaseService.signOut()` + show "Setup failed — please try again" with retry button
+
+- [ ] **H8** Trigger full data pull explicitly after login/signup
+  - `lib/services/sync/sync_service.dart`
+  - Add `SyncService.instance.pullAll()` call at end of successful login and signup flows
+  - Remove or guard the startup call that runs before auth
+
+- [ ] **M11** Add "Remember Me" checkbox on login screen
+  - `lib/screens/auth/login_screen.dart`
+  - Add `flutter_secure_storage` dependency
+  - If checked: save email + encrypted password; load on startup into form fields
+  - If unchecked: clear saved credentials
 
 ---
 
-## Iteration 4 — Subscription & Paywall
+## Iteration 4 — Kitchen & Order Integrity
 
-**Goal:** Make the paywall functional and the subscription system more robust.
+**Goal:** Fix kitchen workflow and order-edit notification gaps.
+
+- [ ] **H6** Notify kitchen when an order is edited after ticket is printed
+  - `lib/screens/orders/edit_order_screen.dart`
+  - After saving edits, if order status is `preparing` or `ready`, set a new `needs_reprint` flag (add to orders table or use a note field)
+  - `lib/screens/kitchen/kitchen_screen.dart` — show a red "Updated" badge on the order card when `needs_reprint = true`
+  - Clear `needs_reprint` flag when kitchen prints new ticket
+
+- [ ] **H7** Restrict Edit button in `OrderDetailScreen` for kitchen role
+  - `lib/screens/orders/order_detail_screen.dart`
+  - Hide / disable Edit action when `staffRoleProvider == 'kitchen'`
+
+- [ ] **M13** Verify receipt footer is printed correctly
+  - `lib/screens/billing/billing_screen.dart` + `lib/services/pdf/pdf_receipt_service.dart`
+  - Log the `settings` map passed to `buildReceipt()` in debug mode
+  - Confirm `AppConstants.settingReceiptFooter` key matches what is saved in `settings` table
+
+---
+
+## Iteration 5 — Subscription, Paywall & Staff Billing
+
+**Goal:** Make upgrade path functional; address billing design gaps.
 
 - [ ] **M1** Add functional contact links to `PaywallScreen`
   - `lib/screens/auth/paywall_screen.dart`
-  - Add `url_launcher` calls: WhatsApp deep link + mailto with pre-filled subject
-  - Replace placeholder email text with tappable `InkWell`
+  - Add `url_launcher`: WhatsApp deep link + mailto with pre-filled subject ("Upgrade to [Plan] — [Restaurant Name]")
+  - Replace static email text with tappable widget
 
-- [ ] **M2** Move plan definitions to a constants file
+- [ ] **M2** Extract plan definitions to constants file
   - Create `lib/core/constants/plan_constants.dart`
-  - Move `_plans` list there; add a comment explaining how to update pricing
+  - Move `_plans` list; comment: "Update pricing here before releasing a new version"
+
+- [ ] **M8** Add "Manage Subscription" section in Settings
+  - `lib/screens/settings/settings_screen.dart`
+  - Show current plan + expiry/renewal date
+  - Add "Cancel / Change Plan" link (opens WhatsApp or mailto)
+
+- [ ] **M9** Enforce staff deactivation server-side
+  - `lib/services/supabase/supabase_service.dart`
+  - On deactivate: set `is_active = false` in Supabase `staff` table
+  - Add a Supabase RLS policy or Edge Function that rejects API calls from staff where `is_active = false`
+  - Document that JWT tokens expire after Supabase's configured expiry (default 1 hour); deactivated staff will lose access within that window
+
+- [ ] **M10** Add staff-add billing warning dialog
+  - `lib/screens/staff/staff_screen.dart`
+  - Before adding new staff: show dialog "Adding a staff member may affect your subscription billing. Contact support to confirm your current plan limits."
+  - Log addition with timestamp in `activity_log`
 
 - [ ] **L3** Remove hardcoded "Rs." from signup trial dialog
   - `lib/screens/auth/signup_screen.dart:187`
-  - Replace price reference with a note to check email for pricing
+  - Remove price mention; replace with "Contact support@platodesk.app for pricing details"
 
 ---
 
-## Iteration 5 — UI/UX Polish
+## Iteration 6 — UI/UX Fixes
 
-**Goal:** Fix UI bugs and improve discoverability.
+**Goal:** Fix visual bugs and confusing messages.
+
+- [ ] **L14** Add logout button to `MainScaffold` AppBar
+  - `lib/widgets/main_scaffold.dart`
+  - Add `IconButton(Icons.logout)` in `AppBar.actions` for all roles
+  - Confirm dialog before signing out
+
+- [ ] **L6** Fix currency default and update everywhere
+  - `lib/core/constants/app_constants.dart` — set `defaultCurrencySymbol = '\$'`
+  - Audit all hardcoded `'Rs.'` strings across all screens — replace with currency from settings
+  - Ensure `CurrencyFormatter` reads from `settingsProvider` so changes propagate immediately
+
+- [ ] **L7** Fix "no tables" message distinction
+  - `lib/screens/orders/new_order_screen.dart`
+  - When `allTables.isEmpty`: "No tables added yet" + button to go to Settings → Tables
+  - When `allTables.isNotEmpty && freeTables.isEmpty`: "No free tables available" (current)
+
+- [ ] **L8** Remove example placeholder text from input fields
+  - Audit all `hintText` values containing `'e.g.'` or specific names/amounts
+  - Replace with generic descriptors: `'Customer name'`, `'Amount'`, `'Phone number'`
+
+- [ ] **L13** Fix expense list item text overlap
+  - `lib/screens/expenses/expenses_screen.dart:209`
+  - Give description `Expanded` with `overflow: ellipsis`; give amount `constraints: BoxConstraints(minWidth: 80)`
 
 - [ ] **L1** Fix trial banner when `trialDaysProvider` is null
-  - `lib/widgets/main_scaffold.dart`
-  - If provider is null, attempt to compute days from cached `restaurantProvider`
+  - `lib/widgets/main_scaffold.dart:67`
+  - Fall back to computing days from `restaurantProvider` if `trialDaysProvider` is null
 
-- [ ] **L2** Improve "complete setup" dialog with specific guidance
-  - `lib/screens/auth/login_screen.dart`
-  - Pass which record is missing (restaurant vs. staff) and show targeted instructions
+- [ ] **L2** Improve "complete setup" dialog clarity
+  - `lib/screens/auth/login_screen.dart:148`
+  - Detect whether restaurant row or staff row is missing; show specific instructions
 
 - [ ] **L4** Fix `MainScaffold` title for untracked routes
-  - `lib/widgets/main_scaffold.dart`
-  - Return empty string or route-derived label instead of falling back to first item
+  - Return `''` instead of falling back to first nav item
 
-- [ ] **L5** Add `DrawerButton` in AppBar when drawer exists
+- [ ] **L5** Add `DrawerButton` in AppBar on mobile when extras exist
   - `lib/widgets/main_scaffold.dart`
-  - Show hamburger icon in `AppBar.leading` when `extras.isNotEmpty` on mobile
 
-- [ ] **M5** Ensure currency has a default before showing dialog
+- [ ] **M5** Ensure currency has default before signup currency dialog
   - `lib/screens/auth/signup_screen.dart`
-  - Set `currency_symbol = 'Rs.'` in settings before showing the picker dialog
+  - Save `currency_symbol = '\$'` before showing picker; update to selection after
+
+---
+
+## Iteration 7 — Onboarding & Session
+
+**Goal:** Better first-run experience; security hardening.
+
+- [ ] **L10** Add multi-step onboarding after first signup
+  - `lib/screens/auth/signup_screen.dart`
+  - Steps: (1) Cafe type selector (QSR / Cafe / Fine Dining / Other), (2) Number of tables (auto-create), (3) Default tax rate, (4) Receipt header/footer
+  - Save all to `settings` table before routing to dashboard
+
+- [ ] **M12** Add session timeout / inactivity lock
+  - Create `lib/services/session_service.dart`
+  - Track last interaction timestamp; after N minutes (configurable in settings, default 30), show re-auth prompt or sign out
+  - Use `AppLifecycleState` for background/foreground transitions
+
+---
+
+## Iteration 8 — Inventory Expansion
+
+**Goal:** Add structured inventory workflows.
+
+- [ ] **L11** Add Purchase sub-screen to Inventory
+  - `lib/screens/inventory/purchase_screen.dart`
+  - Fields: item, quantity received, unit cost, supplier (optional), date
+  - Saves to `inventory_logs` with `type = 'purchase'`; updates `inventory_items.quantity`
+
+- [ ] **L11** Add Issue-to-Kitchen sub-screen to Inventory
+  - `lib/screens/inventory/issue_screen.dart`
+  - Fields: item, quantity issued, reason/note, date
+  - Saves to `inventory_logs` with `type = 'issue'`; deducts from `inventory_items.quantity`
+
+- [ ] **L12** Add `unit_cost` to inventory items
+  - Migrate `inventory_items` table: add `unit_cost REAL DEFAULT 0`
+  - Update `InventoryItemModel` and `InventoryRepository`
+  - Show estimated stock value in inventory screen
+  - Include COGS estimate in Reports
+
+---
+
+## Design Decisions (Require Owner Input Before Implementation)
+
+### D1 — Backup export vs. cloud sync
+Cloud sync (Supabase) now makes the `.platodesk` file export partially redundant.
+- **Option A:** Keep export as user-controlled archive; update description to clarify it's a supplemental backup.
+- **Option B:** Remove import (too risky for conflicts); keep export only for data portability.
+- **Recommended:** Option A. Keep both. The export is a safety net when Supabase is unavailable.
+
+### D2 — Multi-device data loading
+- New device login: `SyncService.pullAll()` downloads all restaurant data from Supabase after login.
+- Local SQLite is rebuilt on the new device from the cloud data.
+- **Gap:** Currently `SyncService.start()` runs at app launch before auth. Need to decouple (see H8 above).
+
+### D3 — Staff deactivation and token expiry
+- Deactivating a staff member sets `is_active = false` in Supabase.
+- Their Supabase JWT expires within the configured session window (default 1 hour). After that, they cannot make authenticated requests.
+- A device with a cached token will still work until the JWT expires. This is acceptable for most use cases.
+- For immediate revocation: requires Supabase Auth admin `deleteUser()` and re-invite if needed.
+
+### D4 — What happens when owner deletes the app
+- Supabase data persists; restaurant and all records remain in the cloud.
+- Subscription/billing is manual (WhatsApp), so no automated cancellation.
+- Owner can reinstall → login → sync pull → all data restored.
+- **Gap:** No in-app "Delete my account / restaurant" flow. Add under Settings if needed.
+
+### D5 — Subscription billing model
+- **Current:** Manual activation via WhatsApp after payment. No automated billing.
+- **Proposed:** Bill at start of each monthly cycle. Staff additions mid-cycle are noted but not double-billed.
+- This is a business process decision, not a code change, until automated billing (Stripe etc.) is integrated.
 
 ---
 
 ## Notes
 
-- Each iteration should be committed separately.
-- Run `flutter analyze` after each iteration — zero warnings/errors required.
-- Test auth flows manually: new signup, login, trial expiry, offline mode, role switching.
+- Each iteration should be committed separately with descriptive commit messages.
+- Run `flutter analyze` after each iteration — zero warnings required.
+- Test flows: new signup, login, trial expiry, offline mode, role switching, kitchen workflow.
+- Mark tasks `[x]` when complete; add new tasks discovered during implementation at the bottom of the relevant iteration.
