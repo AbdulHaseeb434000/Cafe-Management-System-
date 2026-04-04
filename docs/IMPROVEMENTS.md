@@ -224,6 +224,149 @@
 
 ---
 
+## Iteration 9 — Subscription Payment System
+
+**Goal:** Replace manual WhatsApp billing with in-app payment. Pakistan: Easypaisa, JazzCash, Card. International: Card only.
+
+### Flutter tasks (Claude implements)
+
+- [ ] **P1** Add `country` field to signup flow and `SubscriptionPaymentModel`
+  - `lib/screens/auth/signup_screen.dart` — add country dropdown (default `PK`) to step 1 of onboarding; save to Supabase `restaurants.country`
+  - `lib/models/subscription_payment_model.dart` — new model: id, restaurantId, plan, amount, currency, paymentMethod, gateway, gatewayReference, status, createdAt, paidAt
+
+- [ ] **P2** Add `PaymentService` abstraction + Safepay + Stripe implementations
+  - `lib/services/payment/payment_service.dart` — abstract interface with `initiatePayment()` and `verifyPayment()`
+  - `lib/services/payment/safepay_service.dart` — calls Supabase Edge Function `create-safepay-order` → returns hosted checkout URL
+  - `lib/services/payment/stripe_service.dart` — calls Supabase Edge Function `create-stripe-intent` → returns `client_secret`
+  - `lib/services/payment/payment_factory.dart` — reads `restaurant.country`; returns `SafepayService` for `'PK'`, `StripeService` otherwise
+
+- [ ] **P3** Build `SubscriptionScreen` (replaces current WhatsApp-only Manage Subscription)
+  - `lib/screens/subscription/subscription_screen.dart`
+  - Shows: current plan badge, renewal date, price, "Upgrade / Renew" button
+  - Reads from `restaurantProvider`; navigates to `PaymentMethodScreen`
+
+- [ ] **P4** Build `PaymentMethodScreen`
+  - `lib/screens/subscription/payment_method_screen.dart`
+  - Pakistan (`country == 'PK'`): shows 3 tiles — Easypaisa, JazzCash, Card
+  - International: shows Card tile only
+  - Each tile shows logo icon + label + tap → initiates payment
+
+- [ ] **P5** Build `SafepayWebviewScreen` (Pakistan checkout)
+  - `lib/screens/subscription/safepay_webview_screen.dart`
+  - Opens Safepay hosted checkout URL in `webview_flutter`
+  - Intercepts redirect URLs: `platodesk://payment/success` and `platodesk://payment/cancel`
+  - On success: shows loader while polling Supabase for updated `plan` field; refreshes `restaurantProvider`
+
+- [ ] **P6** Build `StripePaymentScreen` (international card)
+  - `lib/screens/subscription/stripe_payment_screen.dart`
+  - Uses `flutter_stripe` payment sheet: `Stripe.instance.initPaymentSheet()` + `presentPaymentSheet()`
+  - On success: refreshes `restaurantProvider`
+
+- [ ] **P7** Wire into Settings and PaywallScreen
+  - `lib/screens/settings/settings_screen.dart` — "Manage Subscription" ListTile navigates to `SubscriptionScreen` instead of launching WhatsApp
+  - `lib/screens/auth/paywall_screen.dart` — "Subscribe Now" button navigates to `SubscriptionScreen`
+
+- [ ] **P8** Update `plan_constants.dart` with international USD pricing
+  - Add `priceUsd` to `PlanInfo`; show PKR when `country == 'PK'`, USD otherwise
+
+- [ ] **P9** Add `pubspec.yaml` dependencies
+  - `flutter_stripe: ^10.2.0` — Stripe native card sheet
+  - `webview_flutter: ^4.8.0` — Safepay hosted checkout
+
+### Your tasks (must be done before Claude can wire up P2–P6)
+
+- [ ] **YOUR-1** Create a [Safepay merchant account](https://getsafepay.com) → get `API_KEY` and `SECRET_KEY`
+  - Safepay supports Easypaisa, JazzCash, and Visa/MC in one checkout — no separate integrations needed
+  - Set allowed redirect URLs: `platodesk://payment/success` and `platodesk://payment/cancel`
+
+- [ ] **YOUR-2** Create a [Stripe account](https://stripe.com) → get `STRIPE_PUBLISHABLE_KEY` and `STRIPE_SECRET_KEY`
+  - Enable "Card" payment method in the Stripe Dashboard → Payment Methods
+
+- [ ] **YOUR-3** Run this SQL in Supabase → SQL Editor:
+  ```sql
+  -- Country and subscription status on restaurants
+  ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS country TEXT NOT NULL DEFAULT 'PK';
+  ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'trial';
+  ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS subscription_renewed_at TIMESTAMPTZ;
+
+  -- Payment history
+  CREATE TABLE IF NOT EXISTS subscription_payments (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    restaurant_id UUID NOT NULL REFERENCES restaurants(id),
+    plan         TEXT NOT NULL,
+    amount       NUMERIC(10,2) NOT NULL,
+    currency     TEXT NOT NULL DEFAULT 'PKR',
+    payment_method TEXT NOT NULL,   -- easypaisa | jazzcash | card
+    gateway      TEXT NOT NULL,     -- safepay | stripe
+    gateway_reference TEXT,
+    status       TEXT NOT NULL DEFAULT 'pending', -- pending | paid | failed | refunded
+    created_at   TIMESTAMPTZ DEFAULT now(),
+    paid_at      TIMESTAMPTZ
+  );
+
+  -- Staff billing metadata
+  ALTER TABLE staff ADD COLUMN IF NOT EXISTS activated_at TIMESTAMPTZ;
+  ALTER TABLE staff ADD COLUMN IF NOT EXISTS billing_cycle_start TIMESTAMPTZ;
+  ALTER TABLE staff ADD COLUMN IF NOT EXISTS is_billed_this_cycle BOOLEAN DEFAULT false;
+  ```
+
+- [ ] **YOUR-4** Deploy 2 Supabase Edge Functions (Claude will write the code):
+  - `create-safepay-order` — creates a Safepay order, returns hosted checkout URL
+  - `create-stripe-intent` — creates a Stripe PaymentIntent, returns `client_secret`
+  - `stripe-webhook` — marks payment paid + updates `restaurants.plan` on `payment_intent.succeeded`
+  - `safepay-webhook` — marks payment paid + updates `restaurants.plan` on Safepay callback
+
+- [ ] **YOUR-5** Set Edge Function secrets in Supabase Dashboard → Project Settings → Edge Functions:
+  - `SAFEPAY_API_KEY`, `SAFEPAY_SECRET_KEY`
+  - `STRIPE_SECRET_KEY`
+  - `STRIPE_WEBHOOK_SECRET` (from Stripe Dashboard → Webhooks)
+
+- [ ] **YOUR-6** Pass Stripe publishable key to Flutter build:
+  ```bash
+  flutter run --dart-define=STRIPE_PUBLISHABLE_KEY=pk_live_xxx
+  ```
+
+---
+
+## Iteration 10 — Account Management & Staff Billing
+
+**Goal:** Implement staff billing lifecycle (D3/D5) and account deletion (D4).
+
+- [ ] **D3a** Staff reactivation billing guard
+  - `lib/screens/staff/staff_screen.dart` — on reactivate: check `billing_cycle_start`; if within same month → free; else → show "New billing cycle starts. Contact support." dialog
+  - `lib/services/supabase/supabase_service.dart` — `reactivateStaff()` sets `activated_at` on first activation; leaves `billing_cycle_start` if within same month
+
+- [ ] **D5a** Billing dashboard in Manage Subscription
+  - `lib/screens/subscription/subscription_screen.dart` — add staff billing section: list each staff member, their `billing_cycle_start`, status (active/inactive), charge amount
+
+- [ ] **D4** "Delete My Account" flow
+  - `lib/screens/settings/settings_screen.dart` — add "Delete Account" option (owner-only, bottom of Settings, red color)
+  - Typed confirmation dialog: owner must type their restaurant name to confirm
+  - Calls `SupabaseService.deleteAccount()` which sets `restaurant.status = 'deleted'`, anonymizes name/email, bans all staff auth users
+  - Signs out locally after completion
+
+---
+
+## Iteration 11 — Sync & Reports Polish
+
+**Goal:** Sync new fields; add CSV export.
+
+- [ ] **S1** Update `SyncService` push/pull for inventory `unit_cost` + `type` columns
+  - `lib/services/sync/sync_service.dart` — ensure `unit_cost` and `type` are included in `inventory_items` and `inventory_logs` payloads
+
+- [ ] **S2** Update `SyncService` for `restaurants.country` and `subscription_status`
+  - Refresh `restaurantProvider` after any subscription payment
+
+- [ ] **R1** CSV export from Reports
+  - Reports screen → overflow menu → "Export as CSV"
+  - Exports the currently visible report table to a `.csv` file via `share_plus`
+
+- [ ] **R2** Session timeout settings UI
+  - `lib/screens/settings/settings_screen.dart` — slider/dropdown for session timeout: 5, 10, 15, 30, 60 min, Never
+  - Saves to `settingSessionTimeout`; `SessionService.instance.timeout` updated immediately
+
+---
+
 ## Design Decisions — RESOLVED
 
 ### D1 — Backup export vs. cloud sync ✓
