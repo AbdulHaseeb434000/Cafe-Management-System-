@@ -59,6 +59,7 @@ Future<void> signOutAndClear(WidgetRef ref) async {
   ref.read(trialDaysProvider.notifier).state = null;
   ref.read(restaurantProvider.notifier).state = null;
   roleRouterNotifier.value = 'waiter';
+  syncNotifier.value = SyncStatus.idle;
 }
 
 /// Ref-free sign-out for contexts without a [WidgetRef] (e.g. plain
@@ -68,4 +69,5 @@ Future<void> signOutAndClear(WidgetRef ref) async {
 Future<void> signOutAndClearNoRef() async {
   await SupabaseService.signOut();
   roleRouterNotifier.value = 'waiter';
+  syncNotifier.value = SyncStatus.idle;
 }

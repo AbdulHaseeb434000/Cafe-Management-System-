@@ -54,37 +54,37 @@
 
 **Goal:** Reliable login/signup; clean state on sign-out.
 
-- [ ] **H4** Replace `signOutAndClearNoRef()` with `signOutAndClear(ref)` in `LoginScreen`
-  - `lib/screens/auth/login_screen.dart:230`
+- [x] **H4** Replaced `signOutAndClearNoRef()` with `signOutAndClear(ref)` in `LoginScreen`
+  - `lib/screens/auth/login_screen.dart` — setup dialog sign-out now resets all providers
 
-- [ ] **H5** Reset `syncNotifier` in both sign-out functions
-  - `lib/providers/auth_providers.dart` — set `syncNotifier.value = SyncStatus.idle`
+- [x] **H5** Reset `syncNotifier` in both sign-out functions
+  - `lib/providers/auth_providers.dart` — both `signOutAndClear` and `signOutAndClearNoRef` now reset to `SyncStatus.idle`
 
-- [ ] **H3** Add offline restaurant fallback in `LoginScreen._submit()`
-  - `lib/screens/auth/login_screen.dart`
-  - Load from `settings` table cache if `fetchRestaurant()` returns null
+- [x] **H3** Added offline restaurant fallback in `LoginScreen._submit()`
+  - On `fetchRestaurant()` failure, loads cached restaurant from `settings` table
+  - Also caches the restaurant row after a successful online fetch
 
-- [ ] **M6** Fix stale `isSignedIn` check
-  - Replace `SupabaseService.isSignedIn` with `Supabase.instance.client.auth.currentSession != null`
+- [x] **M6** Fixed stale `isSignedIn` check
+  - Replaced with `SupabaseService.currentSession != null`
 
-- [ ] **M3** Sanitize exception messages shown to users
-  - Map `AuthException` error codes to user-friendly strings in both `login_screen.dart` and `signup_screen.dart`
-  - Generic fallback: "Something went wrong. Please try again."
+- [x] **M3** Sanitized exception messages shown to users
+  - Added `_friendlyAuthError(AuthException)` in both `login_screen.dart` and `signup_screen.dart`
+  - Maps invalid credentials, email not confirmed, rate limit, etc. to plain English
+  - Generic catch shows "Something went wrong. Please try again."
 
-- [ ] **M4** Handle orphaned auth account after failed `createRestaurant()`
-  - `lib/screens/auth/signup_screen.dart`
-  - On failure: call `SupabaseService.signOut()` + show "Setup failed — please try again" with retry button
+- [x] **M4** Handle orphaned auth account after failed `createRestaurant()`
+  - `lib/screens/auth/signup_screen.dart` — wraps `createRestaurant()` in try/catch; calls `signOut()` before rethrowing
 
-- [ ] **H8** Trigger full data pull explicitly after login/signup
-  - `lib/services/sync/sync_service.dart`
-  - Add `SyncService.instance.pullAll()` call at end of successful login and signup flows
-  - Remove or guard the startup call that runs before auth
+- [x] **H8** Fixed initial data pull on new device / offline first login
+  - `lib/services/sync/sync_service.dart` — `_initialPullIfNeeded()` now confirms online (via `fetchStaffRecord`) before proceeding; flag not written if offline
+  - Connectivity listener now also calls `_initialPullIfNeeded()` on reconnect so offline first-logins automatically pull data when internet is restored
 
-- [ ] **M11** Add "Remember Me" checkbox on login screen
-  - `lib/screens/auth/login_screen.dart`
-  - Add `flutter_secure_storage` dependency
-  - If checked: save email + encrypted password; load on startup into form fields
-  - If unchecked: clear saved credentials
+- [x] **M11** Added "Remember Me" checkbox on login screen
+  - `pubspec.yaml` — added `flutter_secure_storage: ^9.2.2`
+  - `lib/screens/auth/login_screen.dart` — checkbox pre-fills email+password on startup; credentials saved to Android Keystore / iOS Keychain; cleared when unchecked
+
+- [x] **L3** Removed hardcoded "Rs. 2,000/month" from signup trial dialog
+  - `lib/screens/auth/signup_screen.dart` — replaced with contact email reference
 
 ---
 

@@ -1,8 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/database/database_helper.dart';
 import '../../providers/auth_providers.dart';
 import '../../services/supabase/supabase_service.dart';
 import '../../core/theme/app_colors.dart';
@@ -116,13 +120,81 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
   final _passCtrl = TextEditingController();
   bool _obscure = true;
   bool _loading = false;
+  bool _rememberMe = false;
   String? _error;
+
+  static const _storage = FlutterSecureStorage();
+  static const _keyEmail = 'saved_email';
+  static const _keyPass = 'saved_password';
+  static const _keyRemember = 'remember_me';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    try {
+      final remember = await _storage.read(key: _keyRemember);
+      if (remember != '1') return;
+      final email = await _storage.read(key: _keyEmail);
+      final pass = await _storage.read(key: _keyPass);
+      if (email != null && pass != null) {
+        setState(() {
+          _emailCtrl.text = email;
+          _passCtrl.text = pass;
+          _rememberMe = true;
+        });
+      }
+    } catch (_) {
+      // Secure storage unavailable — proceed without pre-fill
+    }
+  }
+
+  Future<void> _saveCredentials() async {
+    try {
+      if (_rememberMe) {
+        await _storage.write(key: _keyEmail, value: _emailCtrl.text.trim());
+        await _storage.write(key: _keyPass, value: _passCtrl.text);
+        await _storage.write(key: _keyRemember, value: '1');
+      } else {
+        await _storage.delete(key: _keyEmail);
+        await _storage.delete(key: _keyPass);
+        await _storage.delete(key: _keyRemember);
+      }
+    } catch (_) {}
+  }
+
+  /// Maps Supabase AuthException messages to user-friendly strings.
+  static String _friendlyAuthError(AuthException e) {
+    final msg = e.message.toLowerCase();
+    if (msg.contains('invalid login credentials') ||
+        msg.contains('invalid_credentials')) {
+      return 'Incorrect email or password.';
+    }
+    if (msg.contains('email not confirmed') ||
+        msg.contains('email_not_confirmed')) {
+      return 'Please confirm your email address before logging in.';
+    }
+    if (msg.contains('user already registered') ||
+        msg.contains('user_already_exists')) {
+      return 'An account with this email already exists.';
+    }
+    if (msg.contains('rate') || msg.contains('too many')) {
+      return 'Too many attempts. Please wait a moment and try again.';
+    }
+    if (msg.contains('network') || msg.contains('connection')) {
+      return 'Connection failed. Check your internet connection.';
+    }
+    return e.message;
   }
 
   Future<void> _submit() async {
@@ -137,12 +209,19 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
 
       if (!mounted) return;
 
-      final restaurant = await SupabaseService.fetchRestaurant();
+      // Try fetching restaurant online; fall back to local cache if offline.
+      Map<String, dynamic>? restaurant;
+      try {
+        restaurant = await SupabaseService.fetchRestaurant();
+        if (restaurant != null) await _cacheRestaurant(restaurant);
+      } catch (_) {
+        restaurant = await _loadCachedRestaurant();
+      }
+
       if (!mounted) return;
 
       if (restaurant == null) {
-        // Auth user exists but restaurant/staff rows were never created
-        // (signup was interrupted). Let the user complete setup now.
+        // Auth OK but no restaurant/staff rows — setup was interrupted.
         setState(() { _loading = false; });
         if (!mounted) return;
         await _showCompleteSetupDialog();
@@ -154,17 +233,23 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
         return;
       }
 
-      // Cache restaurant for settings screen
       ref.read(restaurantProvider.notifier).state = restaurant;
       ref.read(trialDaysProvider.notifier).state =
           SupabaseService.trialDaysLeft(restaurant);
 
-      final staff = await SupabaseService.fetchStaffRecord();
+      Map<String, dynamic>? staff;
+      try {
+        staff = await SupabaseService.fetchStaffRecord();
+      } catch (_) {
+        staff = null;
+      }
       if (!mounted) return;
 
-      // Default to least-privilege role if record is missing.
       final role = staff?['role'] as String? ?? 'waiter';
       setRole(role, ref);
+
+      // Save or clear credentials based on "Remember me" choice.
+      await _saveCredentials();
 
       unawaited(SyncService.instance.triggerOnLogin());
       if (role == 'kitchen') {
@@ -173,10 +258,38 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
         context.go('/');
       }
     } on AuthException catch (e) {
-      setState(() { _error = e.message; _loading = false; });
+      setState(() { _error = _friendlyAuthError(e); _loading = false; });
     } catch (_) {
-      setState(() { _error = 'Something went wrong. Check your connection.'; _loading = false; });
+      setState(() {
+        _error = 'Something went wrong. Please try again.';
+        _loading = false;
+      });
     }
+  }
+
+  /// Load cached restaurant from local SQLite (offline fallback).
+  Future<Map<String, dynamic>?> _loadCachedRestaurant() async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final rows = await db.query('settings',
+          where: 'key = ?', whereArgs: ['cached_restaurant']);
+      if (rows.isEmpty) return null;
+      return Map<String, dynamic>.from(
+          jsonDecode(rows.first['value'] as String) as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _cacheRestaurant(Map<String, dynamic> restaurant) async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      await db.insert(
+        'settings',
+        {'key': 'cached_restaurant', 'value': jsonEncode(restaurant)},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {}
   }
 
   Future<void> _showCompleteSetupDialog() async {
@@ -227,9 +340,10 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                signOutAndClearNoRef();
-                Navigator.pop(ctx);
+              onPressed: () async {
+                // H4: Use signOutAndClear(ref) so Riverpod providers are reset.
+                await signOutAndClear(ref);
+                if (ctx.mounted) Navigator.pop(ctx);
               },
               child: const Text('Sign Out'),
             ),
@@ -247,7 +361,8 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
                     context.go('/');
                   }
                 } catch (e) {
-                  setInner(() => dialogError = e.toString());
+                  setInner(() => dialogError =
+                      'Setup failed. Please try again.');
                 }
               },
               child: const Text('Complete Setup'),
@@ -307,13 +422,32 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
               validator: (v) =>
                   v == null || v.length < 6 ? 'Min. 6 characters' : null,
             ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: _forgotPassword,
-                child: const Text('Forgot Password?'),
-              ),
+            const SizedBox(height: 4),
+            // Remember Me + Forgot Password row
+            Row(
+              children: [
+                Checkbox(
+                  value: _rememberMe,
+                  onChanged: (v) => setState(() => _rememberMe = v ?? false),
+                  visualDensity: VisualDensity.compact,
+                  activeColor: AppColors.primary,
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _rememberMe = !_rememberMe),
+                  child: Text(
+                    'Remember me',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: AppColors.textPrimary),
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: _forgotPassword,
+                  child: const Text('Forgot Password?'),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             FilledButton(
@@ -332,7 +466,8 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
                     )
                   : const Text('Login', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             ),
-            if (SupabaseService.isSignedIn) ...[
+            // M6: Use currentSession (not isSignedIn static getter) for freshness.
+            if (SupabaseService.currentSession != null) ...[
               const SizedBox(height: 8),
               Center(
                 child: TextButton(

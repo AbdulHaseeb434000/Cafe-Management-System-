@@ -46,6 +46,30 @@ class _SignupFormState extends ConsumerState<SignupForm> {
     super.dispose();
   }
 
+  /// Maps Supabase AuthException messages to user-friendly strings.
+  static String _friendlyAuthError(AuthException e) {
+    final msg = e.message.toLowerCase();
+    if (msg.contains('invalid login credentials') ||
+        msg.contains('invalid_credentials')) {
+      return 'Incorrect email or password.';
+    }
+    if (msg.contains('email not confirmed') ||
+        msg.contains('email_not_confirmed')) {
+      return 'Please confirm your email address before logging in.';
+    }
+    if (msg.contains('user already registered') ||
+        msg.contains('user_already_exists')) {
+      return 'An account with this email already exists. Please log in instead.';
+    }
+    if (msg.contains('rate') || msg.contains('too many')) {
+      return 'Too many attempts. Please wait a moment and try again.';
+    }
+    if (msg.contains('network') || msg.contains('connection')) {
+      return 'Connection failed. Check your internet connection.';
+    }
+    return e.message;
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
@@ -57,9 +81,12 @@ class _SignupFormState extends ConsumerState<SignupForm> {
         await _createRestaurant();
       }
     } on AuthException catch (e) {
-      setState(() { _error = e.message; _loading = false; });
+      setState(() { _error = _friendlyAuthError(e); _loading = false; });
     } catch (e) {
-      setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+      setState(() {
+        _error = 'Something went wrong. Please try again.';
+        _loading = false;
+      });
     }
   }
 
@@ -76,12 +103,19 @@ class _SignupFormState extends ConsumerState<SignupForm> {
       return;
     }
 
-    await SupabaseService.createRestaurant(
-      restaurantName: _restaurantCtrl.text.trim(),
-      ownerName: _nameCtrl.text.trim(),
-    );
+    // M4: If restaurant creation fails after auth user is created, sign out
+    // to prevent a dangling account with no restaurant row.
+    try {
+      await SupabaseService.createRestaurant(
+        restaurantName: _restaurantCtrl.text.trim(),
+        ownerName: _nameCtrl.text.trim(),
+      );
+    } catch (_) {
+      await SupabaseService.signOut();
+      rethrow; // surfaces as "Something went wrong" in _submit's catch
+    }
 
-    ref.read(staffRoleProvider.notifier).state = 'owner';
+    setRole('owner', ref);
     unawaited(SyncService.instance.triggerOnLogin());
 
     if (!mounted) return;
@@ -143,7 +177,7 @@ class _SignupFormState extends ConsumerState<SignupForm> {
     );
 
     final role = staff['role'] as String? ?? 'waiter';
-    ref.read(staffRoleProvider.notifier).state = role;
+    setRole(role, ref);
     unawaited(SyncService.instance.triggerOnLogin());
 
     if (!mounted) return;
@@ -184,8 +218,9 @@ class _SignupFormState extends ConsumerState<SignupForm> {
             ),
             SizedBox(height: 8),
             Text(
-              'After the trial, plans start at Rs. 2,000/month for a single device. '
-              'You can manage your subscription from Settings.',
+              'Explore all features during the trial. To continue after '
+              '3 days, contact us at support@platodesk.app for pricing '
+              'and activation details.',
             ),
           ],
         ),
