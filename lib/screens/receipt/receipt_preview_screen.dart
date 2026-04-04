@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
 /// Full-screen PDF preview sized as a thermal receipt strip.
-/// The preview renders at receipt width (not full screen) and includes
-/// built-in Print and Share actions via the [printing] package.
+/// Print and Share actions live in the AppBar; the printing package's
+/// built-in floating action bar is suppressed to keep the UI clean.
 class ReceiptPreviewScreen extends StatelessWidget {
   final Uint8List pdfBytes;
   final String filename;
@@ -35,6 +35,21 @@ class ReceiptPreviewScreen extends StatelessWidget {
           onPressed: onDone ?? () => Navigator.of(context).pop(),
         ),
         title: const Text('Receipt Preview'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print_outlined),
+            tooltip: 'Print',
+            onPressed: () => Printing.layoutPdf(onLayout: (_) => pdfBytes),
+          ),
+          IconButton(
+            icon: const Icon(Icons.share_outlined),
+            tooltip: 'Share',
+            onPressed: () => Printing.sharePdf(
+              bytes: pdfBytes,
+              filename: filename,
+            ),
+          ),
+        ],
       ),
       body: PdfPreview(
         // Return pre-built bytes. PdfPreview reads the embedded page
@@ -42,8 +57,9 @@ class ReceiptPreviewScreen extends StatelessWidget {
         // with double.infinity height or the widget renders blank.
         build: (_) => pdfBytes,
         pdfFileName: filename,
-        allowPrinting: true,
-        allowSharing: true,
+        // Disable the built-in floating action bar — print/share are in the
+        // AppBar above so the bottom-right toggle button does not appear.
+        actions: const [],
         canChangeOrientation: false,
         canChangePageFormat: false,
         // Key: constrains how wide the page renders in the preview so

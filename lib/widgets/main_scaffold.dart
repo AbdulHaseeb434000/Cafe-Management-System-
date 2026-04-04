@@ -4,11 +4,47 @@ import 'package:go_router/go_router.dart';
 import '../core/theme/app_colors.dart';
 import '../providers/auth_providers.dart';
 import '../providers/settings_providers.dart';
+import '../services/supabase/supabase_service.dart';
 
-class MainScaffold extends ConsumerWidget {
+class MainScaffold extends ConsumerStatefulWidget {
   final Widget child;
 
   const MainScaffold({super.key, required this.child});
+
+  @override
+  ConsumerState<MainScaffold> createState() => _MainScaffoldState();
+}
+
+class _MainScaffoldState extends ConsumerState<MainScaffold>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Re-checks plan validity against the locally cached restaurant row
+  /// whenever the app returns to the foreground. No network call needed —
+  /// the trial_end_date is already in the cached restaurantProvider.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPlanExpiry();
+    }
+  }
+
+  void _checkPlanExpiry() {
+    final restaurant = ref.read(restaurantProvider);
+    if (restaurant != null && !SupabaseService.isPlanActive(restaurant)) {
+      if (mounted) context.go('/paywall');
+    }
+  }
 
   // Full nav for owner / manager
   static const _navItems = [
@@ -48,7 +84,7 @@ class MainScaffold extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final role = ref.watch(staffRoleProvider);
     final trialDays = ref.watch(trialDaysProvider);
     // Pre-load settings so they are ready for PDF generation on any screen.
@@ -106,7 +142,7 @@ class MainScaffold extends ConsumerWidget {
         ),
         actions: const [_SyncIcon()],
       ),
-      body: child,
+      body: widget.child,
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.divider)),
@@ -180,7 +216,7 @@ class MainScaffold extends ConsumerWidget {
                   .toList(),
             ),
           ),
-          Expanded(child: child),
+          Expanded(child: widget.child),
         ],
       ),
     );

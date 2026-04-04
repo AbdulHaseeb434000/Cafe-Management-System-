@@ -52,8 +52,8 @@ Set<String> _allowedRoutes(String role) => switch (role) {
 String? _roleRedirect(GoRouterState state) {
   final path = state.matchedLocation;
   // Skip auth/public routes
-  if (path == '/splash' || path == '/login' || path == '/signup' ||
-      path == '/paywall') return null;
+  // Note: /signup is NOT a separate route — SignupForm is a tab inside LoginScreen.
+  if (path == '/splash' || path == '/login' || path == '/paywall') return null;
   // Full-screen transient routes: everyone who is logged in can reach these
   if (path.startsWith('/orders/new') ||
       path.startsWith('/orders/') ||

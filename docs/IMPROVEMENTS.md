@@ -32,20 +32,21 @@
 
 **Goal:** Secure routing; fix navigation edge cases.
 
-- [ ] **H1** Fix route prefix matching bug
-  - `lib/core/router/app_router.dart`
-  - `path.startsWith(r)` → `path == r || path.startsWith('$r/')`
+- [x] **H1** Fix route prefix matching bug — already correctly implemented (`path == r || path.startsWith('$r/')`)
 
-- [ ] **M7** Remove dead `/signup` redirect rule
-  - `lib/core/router/app_router.dart`
+- [x] **M7** Remove dead `/signup` redirect rule
+  - `lib/core/router/app_router.dart` — removed `/signup` from the skip list
 
-- [ ] **H2** Add mid-session plan expiry enforcement in `MainScaffold`
-  - `lib/widgets/main_scaffold.dart`
-  - Periodic `Timer` (every 5 min) that calls `SupabaseService.isPlanActive()` and redirects to `/paywall` if expired
+- [x] **H2** Add mid-session plan expiry enforcement in `MainScaffold`
+  - `lib/widgets/main_scaffold.dart` — converted to `ConsumerStatefulWidget`
+  - Added `WidgetsBindingObserver.didChangeAppLifecycleState` that re-checks
+    `isPlanActive()` against cached `restaurantProvider` on every app resume
+  - No network call needed; uses cached trial_end_date
 
-- [ ] **L9** Hide FAB/bottom nav during full-screen preview routes
-  - Identify where scaffold FAB bleeds into kitchen ticket / bill preview
-  - Set `resizeToAvoidBottomInset: false` or conditionally suppress FAB on preview routes
+- [x] **L9** Hide toggle button in PDF preview screens
+  - `lib/screens/receipt/receipt_preview_screen.dart`
+  - Suppressed `PdfPreview` built-in floating action bar with `actions: const []`
+  - Moved Print and Share as `IconButton`s in the `AppBar`
 
 ---
 
@@ -231,8 +232,12 @@
 ## Design Decisions — RESOLVED
 
 ### D1 — Backup export vs. cloud sync ✓
-- **Decision:** Keep export as user-controlled archive. Remove the import feature (conflict risk with cloud sync).
-- Update export label to: "Local Backup Archive — your data is also synced to the cloud."
+- **Decision:** Remove the entire backup export/import feature.
+  - Format is `.platodesk` (JSON with custom extension) — not CSV or XLS, not human-readable.
+  - Without import, export has no utility. Cloud sync covers data persistence.
+  - Future CSV/XLS exports belong in the Reports module (e.g. "Export orders as CSV").
+- Remove the Export Backup and Import Backup options from Settings.
+- Remove `lib/services/backup/backup_service.dart` and its Settings UI.
 - Tracked in Iteration 5.
 
 ### D2 — Multi-device data loading ✓
