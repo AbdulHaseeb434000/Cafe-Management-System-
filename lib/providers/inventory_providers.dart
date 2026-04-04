@@ -43,6 +43,36 @@ class InventoryNotifier
     await load();
     return updated;
   }
+
+  Future<InventoryItemModel> purchase(
+    InventoryItemModel item, {
+    required double quantity,
+    required double unitCost,
+    String? note,
+  }) async {
+    final updated = await _ref.read(inventoryRepositoryProvider).purchase(
+          item,
+          quantity: quantity,
+          unitCost: unitCost,
+          note: note,
+        );
+    await load();
+    return updated;
+  }
+
+  Future<InventoryItemModel> issue(
+    InventoryItemModel item, {
+    required double quantity,
+    String? reason,
+  }) async {
+    final updated = await _ref.read(inventoryRepositoryProvider).issue(
+          item,
+          quantity: quantity,
+          reason: reason,
+        );
+    await load();
+    return updated;
+  }
 }
 
 final inventoryProvider = StateNotifierProvider<InventoryNotifier,

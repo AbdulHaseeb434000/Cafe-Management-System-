@@ -97,6 +97,19 @@ class DatabaseHelper {
         'ALTER TABLE orders ADD COLUMN needs_reprint INTEGER NOT NULL DEFAULT 0',
       );
     }
+    if (oldVersion < 9) {
+      // L12: unit_cost on inventory items for stock value calculations.
+      await db.execute(
+        'ALTER TABLE inventory_items ADD COLUMN unit_cost REAL NOT NULL DEFAULT 0',
+      );
+      // L11: type and unit_cost on logs to distinguish purchase / issue / adjustment.
+      await db.execute(
+        'ALTER TABLE inventory_logs ADD COLUMN type TEXT NOT NULL DEFAULT "adjustment"',
+      );
+      await db.execute(
+        'ALTER TABLE inventory_logs ADD COLUMN unit_cost REAL NOT NULL DEFAULT 0',
+      );
+    }
   }
 
   Future<void> _seedDefaultSettings(Database db) async {
@@ -238,6 +251,7 @@ class DatabaseHelper {
       unit                TEXT    NOT NULL,
       quantity            REAL    NOT NULL DEFAULT 0,
       low_stock_threshold REAL    NOT NULL DEFAULT 0,
+      unit_cost           REAL    NOT NULL DEFAULT 0,
       updated_at          TEXT    NOT NULL,
       is_deleted          INTEGER NOT NULL DEFAULT 0,
       sync_pending        INTEGER NOT NULL DEFAULT 1
@@ -251,6 +265,8 @@ class DatabaseHelper {
       inventory_item_id   INTEGER NOT NULL,
       inventory_item_uuid TEXT    NOT NULL,
       change_amount       REAL    NOT NULL,
+      type                TEXT    NOT NULL DEFAULT 'adjustment',
+      unit_cost           REAL    NOT NULL DEFAULT 0,
       reason              TEXT,
       created_at          TEXT    NOT NULL,
       sync_pending        INTEGER NOT NULL DEFAULT 1,

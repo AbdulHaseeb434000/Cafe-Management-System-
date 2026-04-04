@@ -203,21 +203,24 @@
 
 **Goal:** Add structured inventory workflows.
 
-- [ ] **L11** Add Purchase sub-screen to Inventory
+- [x] **L11** Add Purchase sub-screen to Inventory
   - `lib/screens/inventory/purchase_screen.dart`
-  - Fields: item, quantity received, unit cost, supplier (optional), date
-  - Saves to `inventory_logs` with `type = 'purchase'`; updates `inventory_items.quantity`
+  - Fields: item dropdown, quantity received, unit cost, supplier/note
+  - Saves to `inventory_logs` with `type = 'purchase'`; updates `inventory_items.quantity` and `unit_cost`
 
-- [ ] **L11** Add Issue-to-Kitchen sub-screen to Inventory
+- [x] **L11** Add Issue-to-Kitchen sub-screen to Inventory
   - `lib/screens/inventory/issue_screen.dart`
-  - Fields: item, quantity issued, reason/note, date
+  - Fields: item dropdown (shows available qty), quantity issued, reason/note
   - Saves to `inventory_logs` with `type = 'issue'`; deducts from `inventory_items.quantity`
+  - Guards against issuing more than available stock
 
-- [ ] **L12** Add `unit_cost` to inventory items
-  - Migrate `inventory_items` table: add `unit_cost REAL DEFAULT 0`
-  - Update `InventoryItemModel` and `InventoryRepository`
-  - Show estimated stock value in inventory screen
-  - Include COGS estimate in Reports
+- [x] **L12** Add `unit_cost` to inventory items
+  - DB v9 migration: `unit_cost` on `inventory_items`; `type` + `unit_cost` on `inventory_logs`
+  - `InventoryItemModel` — added `unitCost`, `stockValue` getter
+  - `InventoryLogModel` — added `type` (default `'adjustment'`), `unitCost`, `totalCost` getter
+  - `InventoryRepository` — `purchase()`, `issue()`, `getPurchaseCostForPeriod()` methods
+  - `InventoryScreen` — stock value summary bar + Purchase/Issue AppBar buttons; log tile shows type label
+  - `ReportsScreen` P&L — added COGS (Inventory Purchases) row deducted from Net Profit
 
 ---
 

@@ -34,6 +34,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   List<Map<String, dynamic>> _paymentSplit = [];
   List<Map<String, dynamic>> _expenses = [];
   double _totalExpenses = 0;
+  double _inventoryCogs = 0;
 
   @override
   void initState() {
@@ -66,6 +67,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final (from, to) = _dateRange;
     final repo = ref.read(orderRepositoryProvider);
     final expRepo = ref.read(expenseRepositoryProvider);
+    final invRepo = ref.read(inventoryRepositoryProvider);
 
     final fSummary = repo.getSummary(from: from, to: to);
     final fTop = repo.getTopItems(from: from, to: to, limit: 10);
@@ -77,10 +79,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final fPayment = repo.getPaymentSplit(from: from, to: to);
     final fExpenses = expRepo.getByCategory(from: from, to: to);
     final fExpTotal = expRepo.getTotalForPeriod(from: from, to: to);
+    final fCogs = invRepo.getPurchaseCostForPeriod(from: from, to: to);
 
     final summary = await fSummary;
     final lists = await Future.wait([fTop, fByType, fDaily, fHourly, fPayment, fExpenses]);
     final expTotal = await fExpTotal;
+    final cogs = await fCogs;
 
     if (!mounted) return;
     setState(() {
@@ -92,6 +96,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       _paymentSplit = lists[4];
       _expenses = lists[5];
       _totalExpenses = expTotal;
+      _inventoryCogs = cogs;
       _loading = false;
     });
   }
@@ -329,6 +334,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       _ProfitLossCard(
                         revenue: revenue,
                         totalExpenses: _totalExpenses,
+                        inventoryCogs: _inventoryCogs,
                         expensesByCategory: _expenses,
                       ),
                     ],
@@ -404,17 +410,19 @@ class _ReportTypeChips extends StatelessWidget {
 class _ProfitLossCard extends StatelessWidget {
   final double revenue;
   final double totalExpenses;
+  final double inventoryCogs;
   final List<Map<String, dynamic>> expensesByCategory;
 
   const _ProfitLossCard({
     required this.revenue,
     required this.totalExpenses,
+    required this.inventoryCogs,
     required this.expensesByCategory,
   });
 
   @override
   Widget build(BuildContext context) {
-    final netProfit = revenue - totalExpenses;
+    final netProfit = revenue - totalExpenses - inventoryCogs;
     final isProfit = netProfit >= 0;
     final profitColor = isProfit ? AppColors.success : AppColors.error;
 
@@ -442,11 +450,20 @@ class _ProfitLossCard extends StatelessWidget {
                 child: Divider(height: 1, color: AppColors.divider),
               ),
               _plRow(
-                label: 'Total Expenses',
+                label: 'Expenses',
                 value: CurrencyFormatter.format(totalExpenses),
                 color: AppColors.error,
                 icon: Icons.arrow_downward,
               ),
+              if (inventoryCogs > 0) ...[
+                const SizedBox(height: 4),
+                _plRow(
+                  label: 'Inventory Purchases (COGS)',
+                  value: CurrencyFormatter.format(inventoryCogs),
+                  color: AppColors.error,
+                  icon: Icons.inventory_2_outlined,
+                ),
+              ],
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Divider(height: 1, color: AppColors.divider),

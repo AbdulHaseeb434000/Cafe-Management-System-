@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_helpers.dart';
 import '../../models/inventory_item_model.dart';
 import '../../models/inventory_log_model.dart';
@@ -8,6 +9,8 @@ import '../../providers/inventory_providers.dart';
 import '../../providers/repository_providers.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/confirm_dialog.dart';
+import 'purchase_screen.dart';
+import 'issue_screen.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -28,6 +31,22 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         title: const Text('Inventory'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.add_shopping_cart_outlined),
+            tooltip: 'Receive Stock',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PurchaseScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.outbox_outlined),
+            tooltip: 'Issue to Kitchen',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const IssueScreen()),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.add_circle_outline),
             tooltip: 'Add Item',
             onPressed: () => _showItemDialog(context),
@@ -36,6 +55,60 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       ),
       body: Column(
         children: [
+          // Stock value summary bar
+          inventoryAsync.maybeWhen(
+            data: (items) {
+              final totalValue =
+                  items.fold<double>(0, (sum, i) => sum + i.stockValue);
+              final lowCount = items.where((i) => i.isLowStock).length;
+              return Container(
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Stock Value',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary)),
+                          Text(CurrencyFormatter.format(totalValue),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 15)),
+                        ],
+                      ),
+                    ),
+                    if (lowCount > 0) ...[
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '$lowCount low stock',
+                          style: const TextStyle(
+                              color: AppColors.warning,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+            orElse: () => const SizedBox.shrink(),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: TextField(
@@ -479,7 +552,14 @@ class _LogTile extends StatelessWidget {
             fontWeight: FontWeight.w600,
             color: isAdd ? AppColors.success : AppColors.error),
       ),
-      subtitle: Text(log.reason ?? 'No reason'),
+      subtitle: Text([
+        log.type == 'purchase'
+            ? 'Purchase'
+            : log.type == 'issue'
+                ? 'Issue to kitchen'
+                : 'Adjustment',
+        if (log.reason != null && log.reason!.isNotEmpty) '· ${log.reason}',
+      ].join(' ')),
       trailing: Text(
         DateHelpers.formatDateTime(log.createdAt),
         style: Theme.of(context)
