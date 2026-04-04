@@ -90,6 +90,13 @@ class DatabaseHelper {
       // the FK, but because we now soft-delete (is_deleted=1) rather than
       // hard-delete, the cascade path is never triggered in practice.
     }
+    if (oldVersion < 8) {
+      // Add needs_reprint flag so kitchen sees a badge when a waiter edits an
+      // order that is already being prepared.
+      await db.execute(
+        'ALTER TABLE orders ADD COLUMN needs_reprint INTEGER NOT NULL DEFAULT 0',
+      );
+    }
   }
 
   Future<void> _seedDefaultSettings(Database db) async {
@@ -184,6 +191,7 @@ class DatabaseHelper {
       created_at       TEXT    NOT NULL,
       completed_at     TEXT,
       is_locked        INTEGER NOT NULL DEFAULT 0,
+      needs_reprint    INTEGER NOT NULL DEFAULT 0,
       sync_pending     INTEGER NOT NULL DEFAULT 1,
       FOREIGN KEY (table_id)    REFERENCES cafe_tables (id),
       FOREIGN KEY (customer_id) REFERENCES customers   (id)

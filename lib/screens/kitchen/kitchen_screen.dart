@@ -166,13 +166,41 @@ class _KitchenCard extends ConsumerWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isUrgent ? AppColors.error : AppColors.divider,
-          width: isUrgent ? 2 : 1,
+          color: order.needsReprint
+              ? Colors.orange
+              : isUrgent ? AppColors.error : AppColors.divider,
+          width: (order.needsReprint || isUrgent) ? 2 : 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // "Order Updated" banner — shown when waiter edited after ticket print
+          if (order.needsReprint)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.edit_notifications_outlined,
+                      size: 14, color: Colors.orange),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text(
+                      'Order updated by waiter — reprint ticket',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           // Header
           Container(
             padding:
@@ -181,8 +209,9 @@ class _KitchenCard extends ConsumerWidget {
               color: isUrgent
                   ? AppColors.error.withValues(alpha: 0.08)
                   : AppColors.surfaceVariant,
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(11)),
+              borderRadius: order.needsReprint
+                  ? BorderRadius.zero
+                  : const BorderRadius.vertical(top: Radius.circular(11)),
             ),
             child: Row(
               children: [
@@ -337,6 +366,8 @@ class _KitchenCard extends ConsumerWidget {
     if (!context.mounted) return;
     // Lock the order to signal kitchen is preparing
     await ref.read(orderRepositoryProvider).setLocked(order.id!, locked: true);
+    // Clear reprint flag — kitchen has acknowledged the update
+    await ref.read(orderRepositoryProvider).setNeedsReprint(order.id!, value: false);
     ref.read(activeOrdersProvider.notifier).load();
     await Navigator.push<void>(
       context,

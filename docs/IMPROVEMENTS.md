@@ -92,20 +92,22 @@
 
 **Goal:** Fix kitchen workflow and order-edit notification gaps.
 
-- [ ] **H6** Notify kitchen when an order is edited after ticket is printed
-  - `lib/screens/orders/edit_order_screen.dart`
-  - After saving edits, if order status is `preparing` or `ready`, set a new `needs_reprint` flag (add to orders table or use a note field)
-  - `lib/screens/kitchen/kitchen_screen.dart` — show a red "Updated" badge on the order card when `needs_reprint = true`
-  - Clear `needs_reprint` flag when kitchen prints new ticket
+- [x] **H6** Notify kitchen when an order is edited after ticket is printed
+  - `lib/core/constants/app_constants.dart` — bumped `dbVersion` to 8
+  - `lib/core/database/database_helper.dart` — added `needs_reprint` column + v8 migration
+  - `lib/models/order_model.dart` — added `needsReprint` field
+  - `lib/repositories/order_repository.dart` — added `setNeedsReprint()`
+  - `lib/screens/orders/edit_order_screen.dart` — sets `needs_reprint = true` when editing a preparing/ready order
+  - `lib/screens/kitchen/kitchen_screen.dart` — orange border + amber banner when `needsReprint`; clears flag on print
+  - `lib/screens/orders/order_detail_screen.dart` — clears `needs_reprint` on `print_kitchen` action
 
-- [ ] **H7** Restrict Edit button in `OrderDetailScreen` for kitchen role
+- [x] **H7** Restrict Edit button in `OrderDetailScreen` for kitchen role
   - `lib/screens/orders/order_detail_screen.dart`
-  - Hide / disable Edit action when `staffRoleProvider == 'kitchen'`
+  - Edit / Force Edit popup items hidden when `staffRoleProvider == 'kitchen'`
+  - Force Edit button in locked-order banner also hidden for kitchen role
 
-- [ ] **M13** Verify receipt footer is printed correctly
-  - `lib/screens/billing/billing_screen.dart` + `lib/services/pdf/pdf_receipt_service.dart`
-  - Log the `settings` map passed to `buildReceipt()` in debug mode
-  - Confirm `AppConstants.settingReceiptFooter` key matches what is saved in `settings` table
+- [x] **M13** Verified receipt footer
+  - Confirmed `AppConstants.settingReceiptFooter` key is consistently used in both `BillingScreen` and `PdfReceiptService`; no mismatch found
 
 ---
 

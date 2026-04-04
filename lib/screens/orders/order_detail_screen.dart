@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_helpers.dart';
 import '../../models/order_model.dart';
+import '../../providers/auth_providers.dart';
 import '../../providers/order_providers.dart';
 import '../../providers/settings_providers.dart';
 import '../../providers/table_providers.dart';
@@ -66,8 +67,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
           if (order.isActive)
             PopupMenuButton<String>(
               onSelected: (v) => _handleAction(v, order),
-              itemBuilder: (_) => [
-                PopupMenuItem(
+              itemBuilder: (_) {
+                final role = ref.read(staffRoleProvider);
+                return [
+                if (role != 'kitchen')
+                  PopupMenuItem(
                     value: order.isLocked ? 'force_edit' : 'edit',
                     child: Text(order.isLocked ? 'Force Edit Order' : 'Edit Order')),
                 if (!order.isPreparing && !order.isReady)
@@ -82,7 +86,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                     value: 'cancel',
                     child: Text('Cancel Order',
                         style: TextStyle(color: AppColors.error))),
-              ],
+              ];
+              },
             ),
         ],
       ),
@@ -112,10 +117,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
                         style: TextStyle(fontSize: 13),
                       ),
                     ),
-                    TextButton(
-                      onPressed: () => _handleAction('force_edit', order),
-                      child: const Text('Force Edit'),
-                    ),
+                    if (ref.read(staffRoleProvider) != 'kitchen')
+                      TextButton(
+                        onPressed: () => _handleAction('force_edit', order),
+                        child: const Text('Force Edit'),
+                      ),
                   ],
                 ),
               ),
@@ -339,6 +345,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen> {
         if (!mounted) return;
         // Lock the order to signal kitchen is preparing
         await ref.read(orderRepositoryProvider).setLocked(order.id!, locked: true);
+        // Clear reprint flag — waiter has re-sent the ticket
+        await ref.read(orderRepositoryProvider).setNeedsReprint(order.id!, value: false);
         await Navigator.push<void>(
           context,
           MaterialPageRoute(

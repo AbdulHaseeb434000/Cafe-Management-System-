@@ -124,6 +124,12 @@ class _EditOrderScreenState extends ConsumerState<EditOrderScreen> {
       total: total.clamp(0, double.infinity),
     ));
 
+    // Flag the kitchen card for reprint if the order is already in-progress.
+    // Kitchen staff will see an "Updated" badge until they reprint the ticket.
+    if (widget.order.isPreparing || widget.order.isReady) {
+      await repo.setNeedsReprint(widget.order.id!, value: true);
+    }
+
     ref.read(activeOrdersProvider.notifier).load();
     if (mounted) Navigator.of(context).pop();
   }

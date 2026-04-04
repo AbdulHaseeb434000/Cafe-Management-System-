@@ -24,6 +24,9 @@ class OrderModel {
   final DateTime createdAt;
   final DateTime? completedAt;
   final bool isLocked;
+  /// True when a waiter has edited this order after the kitchen ticket was
+  /// already printed. Cleared when the kitchen reprints the ticket.
+  final bool needsReprint;
 
   // Eagerly loaded (not in DB columns)
   final List<OrderItemModel> items;
@@ -54,6 +57,7 @@ class OrderModel {
     required this.createdAt,
     this.completedAt,
     this.isLocked = false,
+    this.needsReprint = false,
     this.items = const [],
     this.tableName,
     this.customerName,
@@ -99,6 +103,7 @@ class OrderModel {
     DateTime? createdAt,
     DateTime? completedAt,
     bool? isLocked,
+    bool? needsReprint,
     List<OrderItemModel>? items,
     String? tableName,
     String? customerName,
@@ -125,6 +130,7 @@ class OrderModel {
       createdAt: createdAt ?? this.createdAt,
       completedAt: completedAt ?? this.completedAt,
       isLocked: isLocked ?? this.isLocked,
+      needsReprint: needsReprint ?? this.needsReprint,
       items: items ?? this.items,
       tableName: tableName ?? this.tableName,
       customerName: customerName ?? this.customerName,
@@ -153,6 +159,7 @@ class OrderModel {
         'created_at': DateHelpers.toIso(createdAt),
         'completed_at': completedAt != null ? DateHelpers.toIso(completedAt!) : null,
         'is_locked': isLocked ? 1 : 0,
+        'needs_reprint': needsReprint ? 1 : 0,
       };
 
   factory OrderModel.fromMap(Map<String, dynamic> map) => OrderModel(
@@ -178,6 +185,7 @@ class OrderModel {
             ? DateHelpers.fromIso(map['completed_at'] as String)
             : null,
         isLocked: (map['is_locked'] as int? ?? 0) == 1,
+        needsReprint: (map['needs_reprint'] as int? ?? 0) == 1,
         tableName: map['table_name'] as String?,
         customerName: map['customer_name'] as String?,
         itemCount: (map['item_count'] as num?)?.toInt(),

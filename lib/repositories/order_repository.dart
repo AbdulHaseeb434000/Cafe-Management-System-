@@ -225,6 +225,18 @@ class OrderRepository {
     );
   }
 
+  /// Marks an order as needing a kitchen ticket reprint.
+  /// Set to true after a waiter edits an in-progress order.
+  /// Cleared when the kitchen prints a new ticket.
+  Future<void> setNeedsReprint(int id, {required bool value}) async {
+    await _db.update(
+      _ordersTable,
+      {'needs_reprint': value ? 1 : 0},
+      'id = ?',
+      [id],
+    );
+  }
+
   String _typeLabel(String type) {
     return switch (type) {
       'dine_in' => 'Dine-In',
