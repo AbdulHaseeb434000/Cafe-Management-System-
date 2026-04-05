@@ -110,8 +110,45 @@ create table if not exists subscription_payments (
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- BLOCK 6: RLS for subscription_payments
+-- BLOCK 6: Ensure helper functions exist, then apply RLS for subscription_payments
+--
+-- current_restaurant_id() and current_staff_role() must exist before any
+-- RLS policy that references them. CREATE OR REPLACE is idempotent — safe
+-- whether the functions already exist or not.
 -- ─────────────────────────────────────────────────────────────────────────────
+
+-- Resolves the restaurant_id for the currently signed-in user.
+-- SECURITY DEFINER runs as the function owner (postgres) so it can read the
+-- staff table without triggering its own RLS policies (avoids infinite recursion).
+create or replace function current_restaurant_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select restaurant_id
+  from staff
+  where auth_user_id = auth.uid()
+    and is_active = true
+  limit 1;
+$$;
+
+-- Resolves the role of the currently signed-in user.
+create or replace function current_staff_role()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select role
+  from staff
+  where auth_user_id = auth.uid()
+    and is_active = true
+  limit 1;
+$$;
+
 alter table subscription_payments enable row level security;
 
 -- Drop old policies if re-running
@@ -126,16 +163,14 @@ create policy "sub_payments_select" on subscription_payments
     and current_staff_role() in ('owner', 'manager')
   );
 
--- The Flutter app (via anon key) inserts a pending row before redirecting
--- to Safepay. The Edge Function (service role) later updates it to paid/failed.
--- We allow insert for authenticated users of the restaurant.
+-- The Flutter app inserts a pending row before redirecting to Safepay.
+-- The Edge Function (service role, bypasses RLS) later updates it to paid/failed.
 create policy "sub_payments_write" on subscription_payments
   for insert with check (
     restaurant_id = current_restaurant_id()
   );
 
--- Only the Edge Function (service role, bypasses RLS) updates payment status.
--- No client-side update policy is needed or wanted here.
+-- No client-side update policy — status updates come from the Edge Function only.
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
