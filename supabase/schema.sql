@@ -800,7 +800,7 @@ create index if not exists idx_payments_uuid         on payments             (or
 create index if not exists idx_activity_logs         on activity_logs        (restaurant_id, created_at desc);
 create index if not exists idx_expenses              on expenses             (restaurant_id, date desc);
 create index if not exists idx_inventory_logs_uuid   on inventory_logs       (inventory_item_uuid);
-create index if not exists idx_inventory_logs_type   on inventory_logs       (inventory_item_id, type, created_at desc);
+create index if not exists idx_inventory_logs_type   on inventory_logs       (inventory_item_id, created_at desc);
 create index if not exists idx_staff_auth_user       on staff                (auth_user_id);
 create index if not exists idx_sub_payments_rest     on subscription_payments (restaurant_id, created_at desc);
 create index if not exists idx_sub_payments_status   on subscription_payments (status);

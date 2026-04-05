@@ -54,16 +54,30 @@ end $$;
 -- type distinguishes purchase / issue / adjustment entries.
 -- unit_cost records the price at the time of each purchase for COGS reports.
 -- ─────────────────────────────────────────────────────────────────────────────
+-- ─────────────────────────────────────────────────────────────────────────────
+-- BLOCK 4: inventory_logs — add type and unit_cost (Iteration 8)
+-- type distinguishes purchase / issue / adjustment entries.
+-- unit_cost records the price at the time of each purchase for COGS reports.
+-- NOTE: The CHECK constraint is added separately from ADD COLUMN to avoid a
+-- PostgreSQL quirk where inline CHECK constraints referencing a new column
+-- fail inside a PL/pgSQL DO block (error 42703).
+-- ─────────────────────────────────────────────────────────────────────────────
 do $$ begin
   if not exists (
     select 1 from information_schema.columns
     where table_name = 'inventory_logs' and column_name = 'type'
   ) then
     alter table inventory_logs
-      add column type text not null default 'adjustment'
-        check (type in ('adjustment', 'purchase', 'issue'));
+      add column type text not null default 'adjustment';
   end if;
 end $$;
+
+-- Add the check constraint separately (idempotent — drops first if it exists)
+alter table inventory_logs
+  drop constraint if exists inventory_logs_type_check;
+alter table inventory_logs
+  add constraint inventory_logs_type_check
+    check (type in ('adjustment', 'purchase', 'issue'));
 
 do $$ begin
   if not exists (
