@@ -6,6 +6,7 @@ import '../../providers/auth_providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/plan_constants.dart';
+import '../subscription/subscription_screen.dart';
 
 /// Shown when the trial has expired and no active plan exists.
 /// Displays pricing tiers and actionable contact buttons.
@@ -63,6 +64,28 @@ class PaywallScreen extends ConsumerWidget {
               const SizedBox(height: 28),
               ...PlanConstants.plans.map((plan) => _PlanCard(plan: plan)),
               const SizedBox(height: 20),
+
+              // ── Primary CTA — in-app payment ─────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.credit_card_outlined),
+                  label: const Text('Subscribe Now'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    textStyle: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const SubscriptionScreen()),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── Secondary — support contacts ─────────────────────────────
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -72,27 +95,12 @@ class PaywallScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.support_agent_outlined,
-                            color: AppColors.brown),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Ready to subscribe?',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
                     Text(
-                      'Contact us to activate your plan within minutes.',
+                      'Need help choosing a plan?',
                       style: Theme.of(context)
                           .textTheme
-                          .bodySmall
-                          ?.copyWith(color: AppColors.textSecondary),
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 12),
                     Row(

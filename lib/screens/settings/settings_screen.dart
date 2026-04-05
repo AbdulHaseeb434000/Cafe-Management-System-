@@ -15,6 +15,7 @@ import '../../providers/settings_providers.dart';
 import '../../providers/table_providers.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/section_header.dart';
+import '../subscription/subscription_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -99,10 +100,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             const SectionHeader(title: 'Manage Subscription'),
             ListTile(
+              leading: const Icon(Icons.credit_card_outlined,
+                  size: 22, color: AppColors.primary),
+              title: const Text('Subscription & Billing'),
+              subtitle: const Text('View plans, subscribe or upgrade'),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const SubscriptionScreen()),
+              ),
+            ),
+            const Divider(height: 1, indent: 56),
+            ListTile(
               leading: const Icon(Icons.chat_outlined,
                   size: 22, color: AppColors.textSecondary),
               title: const Text('Chat on WhatsApp'),
-              subtitle: const Text('Upgrade, downgrade or cancel your plan'),
+              subtitle: const Text('Questions about billing or your plan'),
               trailing: const Icon(Icons.open_in_new,
                   size: 16, color: AppColors.textSecondary),
               onTap: () async {

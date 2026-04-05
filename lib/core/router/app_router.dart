@@ -20,6 +20,7 @@ import '../../screens/settings/settings_screen.dart';
 import '../../screens/activity_log/activity_log_screen.dart';
 import '../../screens/expenses/expenses_screen.dart';
 import '../../screens/staff/staff_screen.dart';
+import '../../screens/subscription/subscription_screen.dart';
 import '../../widgets/main_scaffold.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
@@ -53,7 +54,8 @@ String? _roleRedirect(GoRouterState state) {
   final path = state.matchedLocation;
   // Skip auth/public routes
   // Note: /signup is NOT a separate route — SignupForm is a tab inside LoginScreen.
-  if (path == '/splash' || path == '/login' || path == '/paywall') return null;
+  if (path == '/splash' || path == '/login' || path == '/paywall' ||
+      path == '/subscription') return null;
   // Full-screen transient routes: everyone who is logged in can reach these
   if (path.startsWith('/orders/new') ||
       path.startsWith('/orders/') ||
@@ -87,6 +89,11 @@ final appRouter = GoRouter(
       parentNavigatorKey: _rootNavigatorKey,
       path: '/paywall',
       builder: (context, state) => const PaywallScreen(),
+    ),
+    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
+      path: '/subscription',
+      builder: (context, state) => const SubscriptionScreen(),
     ),
 
     // ── Full-screen routes outside the shell ─────────────────────────────

@@ -17,11 +17,30 @@ create table if not exists restaurants (
   owner_email     text not null,
   address         text not null default '',
   phone           text not null default '',
-  plan            text not null default 'trial'
-                    check (plan in ('trial','starter','standard','business','suspended')),
-  trial_end_date  timestamptz,
-  max_devices     int not null default 1,
-  created_at      timestamptz not null default now()
+  plan                     text not null default 'trial'
+                             check (plan in ('trial','starter','standard','business','suspended')),
+  trial_end_date           timestamptz,
+  subscription_renewed_at  timestamptz,
+  max_devices              int not null default 1,
+  created_at               timestamptz not null default now()
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- subscription_payments
+-- ─────────────────────────────────────────────────────────────────────────────
+create table if not exists subscription_payments (
+  id               uuid primary key default uuid_generate_v4(),
+  restaurant_id    uuid not null references restaurants(id) on delete cascade,
+  plan             text not null,
+  amount           numeric(10,2) not null,
+  currency         text not null default 'PKR',
+  payment_method   text not null,   -- easypaisa | jazzcash | card
+  gateway          text not null,   -- safepay | stripe
+  gateway_reference text,
+  status           text not null default 'pending'
+                     check (status in ('pending','paid','failed','refunded')),
+  created_at       timestamptz not null default now(),
+  paid_at          timestamptz
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────

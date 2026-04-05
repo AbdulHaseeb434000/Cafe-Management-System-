@@ -56,6 +56,9 @@ dependencies:
   # Secure credential storage for "Remember Me" login
   flutter_secure_storage: ^9.2.2
 
+  # In-app WebView for Safepay hosted checkout
+  webview_flutter: ^4.8.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

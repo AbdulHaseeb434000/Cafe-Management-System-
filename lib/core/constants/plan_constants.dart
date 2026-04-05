@@ -6,6 +6,7 @@ abstract final class PlanConstants {
 
   static const plans = <PlanInfo>[
     PlanInfo(
+      slug: 'starter',
       name: 'Starter',
       price: 'Rs. 2,000',
       period: '/month',
@@ -18,6 +19,7 @@ abstract final class PlanConstants {
       recommended: false,
     ),
     PlanInfo(
+      slug: 'standard',
       name: 'Standard',
       price: 'Rs. 4,500',
       period: '/month',
@@ -30,6 +32,7 @@ abstract final class PlanConstants {
       recommended: true,
     ),
     PlanInfo(
+      slug: 'business',
       name: 'Business',
       price: 'Rs. 9,000',
       period: '/month',
@@ -46,6 +49,7 @@ abstract final class PlanConstants {
 
 class PlanInfo {
   const PlanInfo({
+    required this.slug,
     required this.name,
     required this.price,
     required this.period,
@@ -54,6 +58,8 @@ class PlanInfo {
     required this.recommended,
   });
 
+  /// Machine-readable identifier sent to the backend. e.g. 'starter'
+  final String slug;
   final String name;
   final String price;
   final String period;
