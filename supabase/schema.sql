@@ -48,17 +48,20 @@ create table if not exists subscription_payments (
 -- auth_user_id is nullable: NULL until an invited staff member signs up
 -- ─────────────────────────────────────────────────────────────────────────────
 create table if not exists staff (
-  id                 uuid primary key default uuid_generate_v4(),
-  invite_code        text unique,
-  invite_expires_at  timestamptz,         -- null once claimed; set on invite creation
-  restaurant_id      uuid not null references restaurants(id) on delete cascade,
-  auth_user_id       uuid references auth.users(id) on delete cascade,  -- nullable for pending invites
-  name               text not null,
-  role               text not null default 'waiter'
-                       check (role in ('owner','manager','waiter','kitchen')),
-  device_name        text,
-  is_active          boolean not null default true,
-  added_at           timestamptz not null default now(),
+  id                   uuid primary key default uuid_generate_v4(),
+  invite_code          text unique,
+  invite_expires_at    timestamptz,
+  restaurant_id        uuid not null references restaurants(id) on delete cascade,
+  auth_user_id         uuid references auth.users(id) on delete cascade,
+  name                 text not null,
+  role                 text not null default 'waiter'
+                         check (role in ('owner','manager','waiter','kitchen')),
+  device_name          text,
+  is_active            boolean not null default true,
+  activated_at         timestamptz,
+  billing_cycle_start  timestamptz,
+  is_billed_this_cycle boolean not null default false,
+  added_at             timestamptz not null default now(),
   unique (restaurant_id, auth_user_id)
 );
 
@@ -131,6 +134,7 @@ create table if not exists orders (
   tax_amount      numeric(10,2) not null default 0,
   total           numeric(10,2) not null default 0,
   note            text,
+  needs_reprint   boolean not null default false,
   created_at      timestamptz not null default now(),
   completed_at    timestamptz,
   is_locked       boolean not null default false
@@ -170,6 +174,7 @@ create table if not exists inventory_items (
   unit                text not null default 'kg',
   quantity            numeric(10,3) not null default 0,
   low_stock_threshold numeric(10,3) not null default 0,
+  unit_cost           numeric(10,2) not null default 0,
   updated_at          timestamptz not null default now(),
   is_deleted          boolean not null default false
 );
@@ -181,6 +186,9 @@ create table if not exists inventory_logs (
   inventory_item_id   bigint references inventory_items(id) on delete set null,
   inventory_item_uuid text not null,
   change_amount       numeric(10,3) not null,
+  type                text not null default 'adjustment'
+                        check (type in ('adjustment', 'purchase', 'issue')),
+  unit_cost           numeric(10,2) not null default 0,
   reason              text,
   created_at          timestamptz not null default now()
 );
@@ -282,6 +290,7 @@ end $$;
 -- ─────────────────────────────────────────────────────────────────────────────
 
 alter table restaurants              enable row level security;
+alter table subscription_payments    enable row level security;
 alter table staff                    enable row level security;
 alter table categories               enable row level security;
 alter table menu_items               enable row level security;
@@ -459,6 +468,8 @@ do $$ begin
   drop policy if exists "snapshots_write"             on device_billing_snapshots;
   drop policy if exists "snapshots_update"            on device_billing_snapshots;
   drop policy if exists "snapshots_delete"            on device_billing_snapshots;
+  drop policy if exists "sub_payments_select"         on subscription_payments;
+  drop policy if exists "sub_payments_write"          on subscription_payments;
 end $$;
 
 -- ── restaurants ───────────────────────────────────────────────────────────────
@@ -722,6 +733,19 @@ create policy "expenses_delete" on expenses
     and current_staff_role() in ('owner', 'manager')
   );
 
+-- ── subscription_payments ─────────────────────────────────────────────────────
+-- Owner/manager can view payment history.
+create policy "sub_payments_select" on subscription_payments
+  for select using (
+    restaurant_id = current_restaurant_id()
+    and current_staff_role() in ('owner', 'manager')
+  );
+
+-- App inserts a pending row when initiating checkout.
+-- The Edge Function (service role) updates status — no client update policy needed.
+create policy "sub_payments_write" on subscription_payments
+  for insert with check (restaurant_id = current_restaurant_id());
+
 -- ── billing_events ────────────────────────────────────────────────────────────
 create policy "billing_events_select" on billing_events
   for select using (
@@ -770,10 +794,13 @@ create policy "snapshots_delete" on device_billing_snapshots
 -- Indexes
 -- ─────────────────────────────────────────────────────────────────────────────
 
-create index if not exists idx_orders_restaurant     on orders          (restaurant_id, created_at desc);
-create index if not exists idx_order_items_uuid      on order_items     (order_uuid);
-create index if not exists idx_payments_uuid         on payments        (order_uuid);
-create index if not exists idx_activity_logs         on activity_logs   (restaurant_id, created_at desc);
-create index if not exists idx_expenses              on expenses        (restaurant_id, date desc);
-create index if not exists idx_inventory_logs_uuid   on inventory_logs  (inventory_item_uuid);
-create index if not exists idx_staff_auth_user       on staff           (auth_user_id);
+create index if not exists idx_orders_restaurant     on orders               (restaurant_id, created_at desc);
+create index if not exists idx_order_items_uuid      on order_items          (order_uuid);
+create index if not exists idx_payments_uuid         on payments             (order_uuid);
+create index if not exists idx_activity_logs         on activity_logs        (restaurant_id, created_at desc);
+create index if not exists idx_expenses              on expenses             (restaurant_id, date desc);
+create index if not exists idx_inventory_logs_uuid   on inventory_logs       (inventory_item_uuid);
+create index if not exists idx_inventory_logs_type   on inventory_logs       (inventory_item_id, type, created_at desc);
+create index if not exists idx_staff_auth_user       on staff                (auth_user_id);
+create index if not exists idx_sub_payments_rest     on subscription_payments (restaurant_id, created_at desc);
+create index if not exists idx_sub_payments_status   on subscription_payments (status);
