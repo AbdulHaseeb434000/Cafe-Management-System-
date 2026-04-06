@@ -12,12 +12,20 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const SAFEPAY_API_KEY    = Deno.env.get('SAFEPAY_API_KEY')!;
-const SAFEPAY_SECRET_KEY = Deno.env.get('SAFEPAY_SECRET_KEY')!;
+const SAFEPAY_API_KEY    = Deno.env.get('SAFEPAY_API_KEY') ?? '';
+const SAFEPAY_SECRET_KEY = Deno.env.get('SAFEPAY_SECRET_KEY') ?? '';
 const SAFEPAY_ENV        = Deno.env.get('SAFEPAY_ENV') ?? 'sandbox';
-const SAFEPAY_BASE       = SAFEPAY_ENV === 'production'
+
+// REST API base (order creation, tracker lookup, etc.)
+const SAFEPAY_BASE = SAFEPAY_ENV === 'production'
   ? 'https://api.getsafepay.com'
   : 'https://sandbox.api.getsafepay.com';
+
+// Hosted checkout page (what the customer sees in the WebView)
+// This is on a different domain from the REST API.
+const SAFEPAY_CHECKOUT = SAFEPAY_ENV === 'production'
+  ? 'https://getsafepay.com'
+  : 'https://sandbox.getsafepay.com';
 
 // Plan amounts in PKR paisas (1 PKR = 100 paisas)
 const PLAN_AMOUNTS: Record<string, number> = {
@@ -40,6 +48,12 @@ serve(async (req: Request) => {
   }
 
   try {
+    // ── 0. Guard: ensure secrets are configured ───────────────────────────
+    if (!SAFEPAY_API_KEY || !SAFEPAY_SECRET_KEY) {
+      console.error('create-safepay-order: SAFEPAY_API_KEY or SAFEPAY_SECRET_KEY not set');
+      return json({ error: 'Payment gateway not configured. Please contact support.' }, 503);
+    }
+
     // ── 1. Verify the caller is an authenticated Supabase user ───────────
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -136,10 +150,11 @@ serve(async (req: Request) => {
       .update({ gateway_reference: trackerToken })
       .eq('id', orderId);
 
+    // Use the hosted checkout domain (not the API domain)
     const checkoutUrl =
-      `${SAFEPAY_BASE}/checkout/pay?tbt=${trackerToken}&source=mobile` +
-      `&redirect_url=platodesk://payment/success` +
-      `&cancel_url=platodesk://payment/cancel`;
+      `${SAFEPAY_CHECKOUT}/checkout/pay?tbt=${trackerToken}` +
+      `&redirect_url=platodesk%3A%2F%2Fpayment%2Fsuccess` +
+      `&cancel_url=platodesk%3A%2F%2Fpayment%2Fcancel`;
 
     return json({ checkoutUrl, orderId });
 

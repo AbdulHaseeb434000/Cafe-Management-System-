@@ -173,7 +173,10 @@ class _NewOrderScreenState extends ConsumerState<NewOrderScreen> {
       ref.read(tablesProvider.notifier).load();
     }
 
-    ref.read(activeOrdersProvider.notifier).load();
+    // Await the reload so kitchen screen always sees the new order with all
+    // items before navigation completes. Not awaiting caused a race where the
+    // kitchen screen could query activeOrdersProvider before items were visible.
+    await ref.read(activeOrdersProvider.notifier).load();
     ref.read(cartProvider.notifier).clear();
 
     if (context.mounted) {

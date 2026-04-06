@@ -202,6 +202,23 @@ class InventoryRepository {
     return (rows.first['total'] as num?)?.toDouble() ?? 0;
   }
 
+  /// Returns all log entries of [type] within the given date range.
+  /// Used by the Inventory Reports tab to calculate issued-cost totals.
+  Future<List<InventoryLogModel>> getLogsForPeriod({
+    required String type,
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final rows = await _db.rawQuery('''
+      SELECT * FROM inventory_logs
+      WHERE type = ?
+        AND created_at >= ?
+        AND created_at <= ?
+      ORDER BY created_at DESC
+    ''', [type, DateHelpers.toIso(from), DateHelpers.toIso(to)]);
+    return rows.map(InventoryLogModel.fromMap).toList();
+  }
+
   Future<List<InventoryLogModel>> getLogs(int itemId) async {
     final rows = await _db.query(
       _logsTable,

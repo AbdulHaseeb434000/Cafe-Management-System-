@@ -20,6 +20,10 @@ class MainScaffold extends ConsumerStatefulWidget {
 
 class _MainScaffoldState extends ConsumerState<MainScaffold>
     with WidgetsBindingObserver {
+  /// User dismissed the trial warning banner this session.
+  /// Resets when the app is restarted. Expiry banner (≤0 days) is never
+  /// dismissible — it forces the user to take action.
+  bool _trialBannerDismissed = false;
   @override
   void initState() {
     super.initState();
@@ -162,21 +166,28 @@ class _MainScaffoldState extends ConsumerState<MainScaffold>
         ? _buildTabletLayout(context, bottomItems, extras, trackedChild)
         : _buildMobileLayout(context, bottomItems, extras, trackedChild);
 
-    // Show trial warning banner.
-    // ≤2 days remaining → soft amber "heads up" notice.
-    // ≤0 days            → urgent red expiry banner.
+    // Trial warning banners:
+    // ≤0 days  → urgent expiry banner (NOT dismissible — forces action)
+    // ≤2 days  → soft amber warning (dismissible for the current session)
     if (trialDays != null && trialDays <= 2) {
-      return Column(
-        children: [
-          trialDays <= 0
-              ? _TrialExpiryBanner(onUpgrade: () => context.go('/paywall'))
-              : _TrialWarnBanner(
-                  daysLeft: trialDays,
-                  onUpgrade: () => context.go('/paywall'),
-                ),
-          Expanded(child: base),
-        ],
-      );
+      final expired = trialDays <= 0;
+      // Show warning only if not dismissed; expiry is always shown
+      if (expired || !_trialBannerDismissed) {
+        return Column(
+          children: [
+            expired
+                ? _TrialExpiryBanner(
+                    onUpgrade: () => context.go('/paywall'))
+                : _TrialWarnBanner(
+                    daysLeft: trialDays,
+                    onUpgrade: () => context.go('/paywall'),
+                    onDismiss: () =>
+                        setState(() => _trialBannerDismissed = true),
+                  ),
+            Expanded(child: base),
+          ],
+        );
+      }
     }
     return base;
   }
@@ -401,34 +412,50 @@ class _SyncIcon extends StatelessWidget {
 }
 
 /// Soft amber warning shown 1-2 days before trial expiry.
+/// Has an [onDismiss] callback so users can hide it for the session.
 class _TrialWarnBanner extends StatelessWidget {
-  const _TrialWarnBanner({required this.daysLeft, required this.onUpgrade});
+  const _TrialWarnBanner({
+    required this.daysLeft,
+    required this.onUpgrade,
+    required this.onDismiss,
+  });
   final int daysLeft;
   final VoidCallback onUpgrade;
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
     final label = daysLeft == 1 ? '1 day left' : '$daysLeft days left';
     return Material(
       color: const Color(0xFFFFF3CD),
-      child: InkWell(
-        onTap: onUpgrade,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              const Icon(Icons.info_outline,
-                  size: 16, color: Color(0xFF856404)),
-              const SizedBox(width: 8),
-              Expanded(
+      child: Padding(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline,
+                size: 15, color: Color(0xFF856404)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: GestureDetector(
+                onTap: onUpgrade,
                 child: Text(
-                  'Trial ending soon ($label) — upgrade to keep access.',
-                  style:
-                      const TextStyle(fontSize: 12, color: Color(0xFF856404)),
+                  'Trial ending soon ($label) — tap to upgrade.',
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF856404)),
                 ),
               ),
-              const SizedBox(width: 8),
-              Text(
+            ),
+            const SizedBox(width: 4),
+            TextButton(
+              onPressed: onUpgrade,
+              style: TextButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
                 'Upgrade',
                 style: TextStyle(
                   fontSize: 12,
@@ -436,8 +463,17 @@ class _TrialWarnBanner extends StatelessWidget {
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
-            ],
-          ),
+            ),
+            // Dismiss button — hides banner for the rest of this session
+            IconButton(
+              onPressed: onDismiss,
+              icon: const Icon(Icons.close, size: 15),
+              color: const Color(0xFF856404),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              tooltip: 'Dismiss',
+            ),
+          ],
         ),
       ),
     );

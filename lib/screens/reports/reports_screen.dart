@@ -73,9 +73,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final fTop = repo.getTopItems(from: from, to: to, limit: 10);
     final fByType = repo.getRevenueByType(from: from, to: to);
     final fDaily = repo.getDailyRevenue(from: from, to: to);
-    final fHourly = _range == _Range.today
-        ? repo.getHourlyRevenue(from: from, to: to)
-        : Future.value(<Map<String, dynamic>>[]);
+    // Always load hourly data for all ranges — aggregated by hour-of-day
+    // so owners can spot peak hours across the week or month, not just today.
+    final fHourly = repo.getHourlyRevenue(from: from, to: to);
     final fPayment = repo.getPaymentSplit(from: from, to: to);
     final fExpenses = expRepo.getByCategory(from: from, to: to);
     final fExpTotal = expRepo.getTotalForPeriod(from: from, to: to);
@@ -250,40 +250,25 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                     ],
 
                     if (_reportType == _ReportType.peakHours) ...[
-                      if (_range != _Range.today) ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.warning.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.info_outline, size: 15, color: AppColors.warning),
-                              const SizedBox(width: 8),
-                              const Expanded(
-                                child: Text(
-                                  'Peak Hours data is available for Today only.',
-                                  style: TextStyle(fontSize: 12, color: AppColors.warning),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
                       if (_hourly.isNotEmpty) ...[
                         _SectionHeader(
                           title: 'Revenue by Hour',
-                          subtitle: 'Today\'s hourly breakdown',
+                          subtitle: _range == _Range.today
+                              ? "Today's hourly breakdown"
+                              : _range == _Range.week
+                                  ? 'Aggregated by hour over the past 7 days'
+                                  : _range == _Range.month
+                                      ? 'Aggregated by hour over the past 30 days'
+                                      : 'Aggregated by hour for selected period',
                         ),
                         const SizedBox(height: 8),
                         _HourlyBarChart(data: _hourly),
                         const SizedBox(height: 16),
                         _SectionHeader(
                           title: 'Peak Hours',
-                          subtitle: 'Customers by hour',
+                          subtitle: _range == _Range.today
+                              ? 'Orders by hour today'
+                              : 'Orders by hour — helps identify busiest times',
                         ),
                         const SizedBox(height: 8),
                         _PeakHoursCard(data: _hourly),
@@ -291,8 +276,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 32),
                           child: Center(
-                            child: Text('No hourly data yet today',
-                                style: TextStyle(color: AppColors.textSecondary)),
+                            child: Text(
+                                'No order data for the selected period',
+                                style: TextStyle(
+                                    color: AppColors.textSecondary)),
                           ),
                         ),
                     ],
