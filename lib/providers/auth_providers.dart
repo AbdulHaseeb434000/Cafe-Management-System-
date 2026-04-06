@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/session_service.dart';
 import '../services/supabase/supabase_service.dart';
 
 /// Cloud sync status shown in the app bar.
@@ -34,6 +35,16 @@ final syncNotifier = ValueNotifier<SyncStatus>(SyncStatus.idle);
 /// provider's least-privilege default.
 final roleRouterNotifier = ValueNotifier<String>('waiter');
 
+/// Sets the staff role atomically in both the Riverpod provider (for UI) and
+/// the [roleRouterNotifier] bridge (for GoRouter redirect).
+///
+/// Always use this helper instead of writing to either store directly so they
+/// can never fall out of sync.
+void setRole(String role, WidgetRef ref) {
+  ref.read(staffRoleProvider.notifier).state = role;
+  roleRouterNotifier.value = role;
+}
+
 /// Signs out the current user and atomically resets all auth-related state.
 ///
 /// Call this at every sign-out site instead of calling
@@ -49,6 +60,8 @@ Future<void> signOutAndClear(WidgetRef ref) async {
   ref.read(trialDaysProvider.notifier).state = null;
   ref.read(restaurantProvider.notifier).state = null;
   roleRouterNotifier.value = 'waiter';
+  syncNotifier.value = SyncStatus.idle;
+  SessionService.instance.clear();
 }
 
 /// Ref-free sign-out for contexts without a [WidgetRef] (e.g. plain
@@ -58,4 +71,6 @@ Future<void> signOutAndClear(WidgetRef ref) async {
 Future<void> signOutAndClearNoRef() async {
   await SupabaseService.signOut();
   roleRouterNotifier.value = 'waiter';
+  syncNotifier.value = SyncStatus.idle;
+  SessionService.instance.clear();
 }

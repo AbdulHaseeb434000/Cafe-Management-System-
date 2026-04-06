@@ -99,6 +99,7 @@ class InventoryRepository {
       inventoryItemId: item.id!,
       inventoryItemUuid: item.uuid,
       changeAmount: change,
+      type: 'adjustment',
       reason: reason,
     );
     await _db.insert(_logsTable, log.toMap());
@@ -111,6 +112,94 @@ class InventoryRepository {
           '${reason != null && reason.isNotEmpty ? ' — $reason' : ''}',
     );
     return updated;
+  }
+
+  /// Records a purchase: adds [quantity] to stock, updates [unitCost] on the
+  /// item, and writes a log entry with [type = 'purchase'].
+  Future<InventoryItemModel> purchase(
+    InventoryItemModel item, {
+    required double quantity,
+    required double unitCost,
+    String? note,
+  }) async {
+    final newQty = item.quantity + quantity;
+    final now = DateTime.now();
+    // Update item quantity and unit cost
+    await _db.update(_itemsTable, {
+      'quantity': newQty,
+      'unit_cost': unitCost,
+      'updated_at': DateHelpers.toIso(now),
+    }, 'id = ?', [item.id]);
+
+    final log = InventoryLogModel.create(
+      inventoryItemId: item.id!,
+      inventoryItemUuid: item.uuid,
+      changeAmount: quantity,
+      type: 'purchase',
+      unitCost: unitCost,
+      reason: note,
+    );
+    await _db.insert(_logsTable, log.toMap());
+
+    ActivityLogRepository.instance.log(
+      actionType: 'inventory_purchased',
+      entityType: 'inventory_item',
+      entityName: item.name,
+      details: '+${quantity.toStringAsFixed(2)} ${item.unit} @ $unitCost/unit',
+    );
+
+    return item.copyWith(quantity: newQty, unitCost: unitCost, updatedAt: now);
+  }
+
+  /// Records an issue-to-kitchen: deducts [quantity] from stock and writes a
+  /// log entry with [type = 'issue'].
+  Future<InventoryItemModel> issue(
+    InventoryItemModel item, {
+    required double quantity,
+    String? reason,
+  }) async {
+    final newQty = (item.quantity - quantity).clamp(0.0, double.infinity);
+    final now = DateTime.now();
+    await _db.update(_itemsTable, {
+      'quantity': newQty,
+      'updated_at': DateHelpers.toIso(now),
+    }, 'id = ?', [item.id]);
+
+    final log = InventoryLogModel.create(
+      inventoryItemId: item.id!,
+      inventoryItemUuid: item.uuid,
+      changeAmount: -quantity,
+      type: 'issue',
+      unitCost: item.unitCost,
+      reason: reason,
+    );
+    await _db.insert(_logsTable, log.toMap());
+
+    ActivityLogRepository.instance.log(
+      actionType: 'inventory_issued',
+      entityType: 'inventory_item',
+      entityName: item.name,
+      details: '-${quantity.toStringAsFixed(2)} ${item.unit}'
+          '${reason != null && reason.isNotEmpty ? ' — $reason' : ''}',
+    );
+
+    return item.copyWith(quantity: newQty, updatedAt: now);
+  }
+
+  /// Returns the total cost of all [type = 'purchase'] log entries in the
+  /// given period. Used as a COGS estimate in the P&L report.
+  Future<double> getPurchaseCostForPeriod({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final rows = await _db.rawQuery('''
+      SELECT COALESCE(SUM(change_amount * unit_cost), 0) AS total
+      FROM inventory_logs
+      WHERE type = 'purchase'
+        AND created_at >= ?
+        AND created_at <= ?
+    ''', [DateHelpers.toIso(from), DateHelpers.toIso(to)]);
+    return (rows.first['total'] as num?)?.toDouble() ?? 0;
   }
 
   Future<List<InventoryLogModel>> getLogs(int itemId) async {

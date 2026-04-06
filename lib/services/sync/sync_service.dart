@@ -46,7 +46,12 @@ class SyncService {
         .onConnectivityChanged
         .listen((results) {
       final online = results.any((r) => r != ConnectivityResult.none);
-      if (online) unawaited(push());
+      if (online) {
+        unawaited(push());
+        // Also retry the initial pull if it was skipped while offline
+        // (e.g. user logged in without internet on a fresh install).
+        unawaited(_initialPullIfNeeded());
+      }
     });
   }
 
@@ -125,6 +130,8 @@ class SyncService {
   // ── Pull: Supabase → local (first login / new device) ───────────────────
 
   Future<void> _initialPullIfNeeded() async {
+    if (!SupabaseService.isSignedIn) return;
+
     final db = await DatabaseHelper.instance.database;
     final flag = await db.query(
       'settings',
@@ -132,6 +139,12 @@ class SyncService {
       whereArgs: ['initial_pull_done'],
     );
     if (flag.isNotEmpty) return;
+
+    // Confirm we can reach Supabase before pulling. If offline, the flag is
+    // NOT written so the pull will be retried when connectivity is restored
+    // (via the connectivity listener in start()).
+    final staff = await SupabaseService.fetchStaffRecord();
+    if (staff == null) return;
 
     await _fullPull();
 

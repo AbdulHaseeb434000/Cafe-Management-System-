@@ -8,6 +8,7 @@ class InventoryItemModel {
   final String unit;
   final double quantity;
   final double lowStockThreshold;
+  final double unitCost;
   final DateTime updatedAt;
   final bool isDeleted;
 
@@ -18,11 +19,15 @@ class InventoryItemModel {
     required this.unit,
     this.quantity = 0,
     this.lowStockThreshold = 0,
+    this.unitCost = 0,
     required this.updatedAt,
     this.isDeleted = false,
   });
 
   bool get isLowStock => lowStockThreshold > 0 && quantity <= lowStockThreshold;
+
+  /// Estimated stock value: quantity × unit cost (0 if unit cost unset).
+  double get stockValue => quantity * unitCost;
 
   InventoryItemModel copyWith({
     int? id,
@@ -31,6 +36,7 @@ class InventoryItemModel {
     String? unit,
     double? quantity,
     double? lowStockThreshold,
+    double? unitCost,
     DateTime? updatedAt,
     bool? isDeleted,
   }) {
@@ -41,6 +47,7 @@ class InventoryItemModel {
       unit: unit ?? this.unit,
       quantity: quantity ?? this.quantity,
       lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
+      unitCost: unitCost ?? this.unitCost,
       updatedAt: updatedAt ?? this.updatedAt,
       isDeleted: isDeleted ?? this.isDeleted,
     );
@@ -53,6 +60,7 @@ class InventoryItemModel {
         'unit': unit,
         'quantity': quantity,
         'low_stock_threshold': lowStockThreshold,
+        'unit_cost': unitCost,
         'updated_at': DateHelpers.toIso(updatedAt),
         'is_deleted': isDeleted ? 1 : 0,
       };
@@ -65,6 +73,7 @@ class InventoryItemModel {
         unit: map['unit'] as String,
         quantity: (map['quantity'] as num?)?.toDouble() ?? 0,
         lowStockThreshold: (map['low_stock_threshold'] as num?)?.toDouble() ?? 0,
+        unitCost: (map['unit_cost'] as num?)?.toDouble() ?? 0,
         updatedAt: DateHelpers.fromIso(map['updated_at'] as String),
         isDeleted: (map['is_deleted'] as int? ?? 0) == 1,
       );
@@ -74,6 +83,7 @@ class InventoryItemModel {
     required String unit,
     double quantity = 0,
     double lowStockThreshold = 0,
+    double unitCost = 0,
   }) =>
       InventoryItemModel(
         uuid: const Uuid().v4(),
@@ -81,6 +91,7 @@ class InventoryItemModel {
         unit: unit,
         quantity: quantity,
         lowStockThreshold: lowStockThreshold,
+        unitCost: unitCost,
         updatedAt: DateTime.now(),
       );
 }

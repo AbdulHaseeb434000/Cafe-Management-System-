@@ -1,14 +1,68 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/constants/app_constants.dart';
 import '../core/theme/app_colors.dart';
+import '../core/utils/currency_formatter.dart';
 import '../providers/auth_providers.dart';
 import '../providers/settings_providers.dart';
+import '../services/session_service.dart';
+import '../services/supabase/supabase_service.dart';
 
-class MainScaffold extends ConsumerWidget {
+class MainScaffold extends ConsumerStatefulWidget {
   final Widget child;
 
   const MainScaffold({super.key, required this.child});
+
+  @override
+  ConsumerState<MainScaffold> createState() => _MainScaffoldState();
+}
+
+class _MainScaffoldState extends ConsumerState<MainScaffold>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Re-checks plan validity against the locally cached restaurant row
+  /// whenever the app returns to the foreground. No network call needed —
+  /// the trial_end_date is already in the cached restaurantProvider.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPlanExpiry();
+      _checkSessionTimeout();
+    }
+  }
+
+  void _checkPlanExpiry() {
+    final restaurant = ref.read(restaurantProvider);
+    if (restaurant != null && !SupabaseService.isPlanActive(restaurant)) {
+      if (mounted) context.go('/paywall');
+    }
+  }
+
+  void _checkSessionTimeout() {
+    if (!SessionService.instance.checkTimeout()) return;
+    SessionService.instance.clear();
+    signOutAndClear(ref);
+    if (!mounted) return;
+    context.go('/login');
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Session expired. Please sign in again.'),
+        duration: Duration(seconds: 4),
+      ),
+    );
+  }
 
   // Full nav for owner / manager
   static const _navItems = [
@@ -47,19 +101,66 @@ class MainScaffold extends ConsumerWidget {
     return idx == -1 ? 0 : idx;
   }
 
+  Future<void> _confirmSignOut(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+            style:
+                FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      await signOutAndClear(ref);
+      if (mounted) context.go('/login');
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final role = ref.watch(staffRoleProvider);
-    final trialDays = ref.watch(trialDaysProvider);
     // Pre-load settings so they are ready for PDF generation on any screen.
-    ref.watch(settingsNotifierProvider);
+    final settings = ref.watch(settingsNotifierProvider).valueOrNull ?? {};
+    // Keep CurrencyFormatter in sync with the user's chosen symbol.
+    CurrencyFormatter.currentSymbol =
+        settings[AppConstants.settingCurrencySymbol] ??
+            AppConstants.defaultCurrencySymbol;
+    // Sync session timeout from settings so changes apply immediately.
+    final timeoutMin = int.tryParse(
+            settings[AppConstants.settingSessionTimeout] ?? '') ??
+        AppConstants.defaultSessionTimeoutMinutes;
+    SessionService.instance.timeout = Duration(minutes: timeoutMin);
+    // L1: Use trialDaysProvider if set; fall back to computing from restaurant.
+    final restaurant = ref.watch(restaurantProvider);
+    int? trialDays = ref.watch(trialDaysProvider);
+    if (trialDays == null && restaurant != null) {
+      trialDays = SupabaseService.trialDaysLeft(restaurant);
+    }
     final isWaiter = role == 'waiter';
     final bottomItems = isWaiter ? _waiterNavItems : _navItems;
     final extras = isWaiter ? const <_NavItem>[] : _railExtras;
     final isTablet = MediaQuery.of(context).size.width >= 600;
+    // Wrap child in a transparent GestureDetector to reset the inactivity
+    // timer on any tap or drag, without blocking child hit-tests.
+    final trackedChild = GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTapDown: (_) => SessionService.instance.touch(),
+      onPanDown: (_) => SessionService.instance.touch(),
+      child: widget.child,
+    );
     final base = isTablet
-        ? _buildTabletLayout(context, bottomItems, extras)
-        : _buildMobileLayout(context, bottomItems, extras);
+        ? _buildTabletLayout(context, bottomItems, extras, trackedChild)
+        : _buildMobileLayout(context, bottomItems, extras, trackedChild);
 
     // Show trial warning banner.
     // ≤2 days remaining → soft amber "heads up" notice.
@@ -80,31 +181,44 @@ class MainScaffold extends ConsumerWidget {
     return base;
   }
 
-  Widget _buildMobileLayout(BuildContext context, List<_NavItem> bottomItems, List<_NavItem> extras) {
+  Widget _buildMobileLayout(BuildContext context, List<_NavItem> bottomItems,
+      List<_NavItem> extras, Widget child) {
     final path = _currentPath(context);
     final idx = _bottomIndex(path, bottomItems);
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 48,
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu),
-            tooltip: 'More',
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
-        ),
+        leading: extras.isEmpty
+            ? null
+            : Builder(
+                builder: (ctx) => DrawerButton(
+                  onPressed: () => Scaffold.of(ctx).openDrawer(),
+                ),
+              ),
         title: Text(
-          bottomItems.firstWhere((e) => path.startsWith(e.path),
+          bottomItems
+              .firstWhere((e) => path.startsWith(e.path),
                   orElse: () => extras.firstWhere(
                       (e) => path.startsWith(e.path),
-                      orElse: () => bottomItems.first))
+                      orElse: () => const _NavItem(
+                          label: '',
+                          icon: Icons.home_outlined,
+                          activeIcon: Icons.home,
+                          path: '')))
               .label,
           style: Theme.of(context)
               .textTheme
               .titleMedium
               ?.copyWith(fontWeight: FontWeight.w600),
         ),
-        actions: const [_SyncIcon()],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Sign out',
+            onPressed: () => _confirmSignOut(context),
+          ),
+          const _SyncIcon(),
+        ],
       ),
       body: child,
       bottomNavigationBar: Container(
@@ -130,7 +244,8 @@ class MainScaffold extends ConsumerWidget {
     );
   }
 
-  Widget _buildTabletLayout(BuildContext context, List<_NavItem> bottomItems, List<_NavItem> extras) {
+  Widget _buildTabletLayout(BuildContext context, List<_NavItem> bottomItems,
+      List<_NavItem> extras, Widget child) {
     final path = _currentPath(context);
     final allItems = [...bottomItems, ...extras];
     final idx = _railIndex(path, allItems);
@@ -167,6 +282,15 @@ class MainScaffold extends ConsumerWidget {
                           ),
                     ),
                   ],
+                ),
+              ),
+              trailing: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: IconButton(
+                  icon: const Icon(Icons.logout),
+                  tooltip: 'Sign out',
+                  color: AppColors.textSecondary,
+                  onPressed: () => _confirmSignOut(context),
                 ),
               ),
               destinations: allItems
