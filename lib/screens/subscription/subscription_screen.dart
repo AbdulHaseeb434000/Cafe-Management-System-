@@ -118,11 +118,11 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
       }
     } on SafepayException catch (e) {
       if (mounted) {
-        _showError(e.message);
+        _showErrorDialog(e.message);
       }
     } catch (e) {
       if (mounted) {
-        _showError('Something went wrong. Please try again.');
+        _showErrorDialog('$e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -155,6 +155,61 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: AppColors.error),
+    );
+  }
+
+  /// Shows a persistent error dialog so the user can read — and share —
+  /// the exact technical message instead of a vanishing SnackBar.
+  void _showErrorDialog(String msg) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: AppColors.error, size: 20),
+            SizedBox(width: 8),
+            Text('Payment Error'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Something went wrong. The exact error is shown below — '
+              'please share it with support or check Supabase Edge Function logs.',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: SelectableText(
+                msg,
+                style: const TextStyle(
+                    fontSize: 12, fontFamily: 'monospace'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Tip: Go to Supabase Dashboard → Edge Functions → '
+              'create-safepay-order → Logs to see server-side details.',
+              style: TextStyle(
+                  fontSize: 11, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 }

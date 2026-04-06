@@ -134,14 +134,19 @@ serve(async (req: Request) => {
 
     if (!safepayRes.ok) {
       const errBody = await safepayRes.text();
-      throw new Error(`Safepay ${safepayRes.status}: ${errBody}`);
+      console.error(`Safepay API error ${safepayRes.status}:`, errBody);
+      throw new Error(`Safepay API returned ${safepayRes.status}: ${errBody}`);
     }
 
     const safepayData = await safepayRes.json();
+    console.log('Safepay API response:', JSON.stringify(safepayData));
+
     // Response shape: { data: { tracker: { token: "...", ... } }, status: {...} }
-    const trackerToken: string = safepayData?.data?.tracker?.token;
+    const trackerToken: string | undefined = safepayData?.data?.tracker?.token;
     if (!trackerToken) {
-      throw new Error(`No tracker token. Response: ${JSON.stringify(safepayData)}`);
+      throw new Error(
+        `No tracker token in Safepay response. Full response: ${JSON.stringify(safepayData)}`
+      );
     }
 
     // ── 6. Save the tracker token and return checkout URL ─────────────────
@@ -150,12 +155,17 @@ serve(async (req: Request) => {
       .update({ gateway_reference: trackerToken })
       .eq('id', orderId);
 
-    // Use the hosted checkout domain (not the API domain)
+    // Use the hosted checkout domain (not the API domain).
+    // For sandbox, add env=sandbox so the Safepay UI loads in test mode.
+    const envParam = SAFEPAY_ENV === 'sandbox' ? '&env=sandbox' : '';
     const checkoutUrl =
-      `${SAFEPAY_CHECKOUT}/checkout/pay?tbt=${trackerToken}` +
+      `${SAFEPAY_CHECKOUT}/checkout/pay` +
+      `?tbt=${trackerToken}` +
+      envParam +
       `&redirect_url=platodesk%3A%2F%2Fpayment%2Fsuccess` +
       `&cancel_url=platodesk%3A%2F%2Fpayment%2Fcancel`;
 
+    console.log('Checkout URL:', checkoutUrl);
     return json({ checkoutUrl, orderId });
 
   } catch (err) {

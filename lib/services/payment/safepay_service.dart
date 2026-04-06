@@ -18,25 +18,44 @@ class SafepayService {
     required String paymentMethod,
   }) async {
     final session = SupabaseService.currentSession;
-    if (session == null) throw SafepayException('Not signed in');
+    if (session == null) throw const SafepayException('Not signed in');
 
-    final res = await SupabaseService.client.functions.invoke(
-      'create-safepay-order',
-      body: {'plan': plan, 'paymentMethod': paymentMethod},
-    );
+    late final dynamic rawData;
+    late final int status;
 
-    if (res.status != 200) {
-      final msg = (res.data as Map<String, dynamic>?)?['error']
-          as String? ?? 'Unknown error (${res.status})';
+    try {
+      final res = await SupabaseService.client.functions.invoke(
+        'create-safepay-order',
+        body: {'plan': plan, 'paymentMethod': paymentMethod},
+      );
+      rawData = res.data;
+      status  = res.status;
+    } catch (e) {
+      throw SafepayException('Network error calling payment service: $e');
+    }
+
+    if (status != 200) {
+      // Safely extract error regardless of whether data is Map or String
+      String msg = 'Payment service error (HTTP $status)';
+      if (rawData is Map) {
+        msg = rawData['error']?.toString() ?? msg;
+      } else if (rawData != null) {
+        msg = 'HTTP $status: $rawData';
+      }
       throw SafepayException(msg);
     }
 
-    final data = res.data as Map<String, dynamic>;
-    final checkoutUrl = data['checkoutUrl'] as String?;
-    final orderId     = data['orderId']     as String?;
+    if (rawData is! Map) {
+      throw SafepayException(
+          'Unexpected response from payment service: $rawData');
+    }
+
+    final checkoutUrl = rawData['checkoutUrl'] as String?;
+    final orderId     = rawData['orderId']     as String?;
 
     if (checkoutUrl == null || orderId == null) {
-      throw SafepayException('Invalid response from server');
+      throw SafepayException(
+          'Missing checkoutUrl/orderId in response: $rawData');
     }
 
     return SafepayOrderResult(checkoutUrl: checkoutUrl, orderId: orderId);
