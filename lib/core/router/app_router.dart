@@ -55,11 +55,15 @@ String? _roleRedirect(GoRouterState state) {
   // Skip auth/public routes
   // Note: /signup is NOT a separate route — SignupForm is a tab inside LoginScreen.
   if (path == '/splash' || path == '/login' || path == '/paywall' ||
-      path == '/subscription') return null;
+      path == '/subscription') {
+    return null;
+  }
   // Full-screen transient routes: everyone who is logged in can reach these
   if (path.startsWith('/orders/new') ||
       path.startsWith('/orders/') ||
-      path.startsWith('/billing/')) return null;
+      path.startsWith('/billing/')) {
+    return null;
+  }
 
   final role = roleRouterNotifier.value;
   final allowed = _allowedRoutes(role);

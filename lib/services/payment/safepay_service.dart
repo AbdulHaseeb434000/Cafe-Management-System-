@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../supabase/supabase_service.dart';
 import '../../models/subscription_payment_model.dart';
 
