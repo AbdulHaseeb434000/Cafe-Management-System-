@@ -466,16 +466,19 @@ class _SignupFormState extends ConsumerState<SignupForm> {
         actions: [
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              SessionService.instance.touch(); // start inactivity timer
-              context.go('/');
-            },
+            // Only pop the dialog here — navigation happens after showDialog()
+            // returns so the dialog is fully dismissed before GoRouter replaces
+            // the widget tree. Calling context.go() inside onPressed while the
+            // dialog pop is still animating causes '_dependents.isEmpty' crash.
+            onPressed: () => Navigator.of(ctx).pop(),
             child: const Text("Let's go!"),
           ),
         ],
       ),
     );
+    // Dialog is fully gone — safe to navigate now
+    SessionService.instance.touch();
+    if (mounted) context.go('/');
   }
 
   @override
