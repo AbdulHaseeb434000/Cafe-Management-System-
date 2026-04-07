@@ -152,12 +152,6 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     }
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: AppColors.error),
-    );
-  }
-
   /// Shows a persistent error dialog so the user can read — and share —
   /// the exact technical message instead of a vanishing SnackBar.
   void _showErrorDialog(String msg) {
